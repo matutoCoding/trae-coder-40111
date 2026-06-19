@@ -1,10 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import ApprovalCard from '@/components/ApprovalCard';
 import SectionHeader from '@/components/SectionHeader';
 import { useAppStore } from '@/store';
 import { currentUser } from '@/data/user';
+import { formatDateTime } from '@/utils/date';
 import styles from './index.module.scss';
 
 const ApprovalPage: React.FC = () => {
@@ -14,6 +15,8 @@ const ApprovalPage: React.FC = () => {
   const pendingApprovals = useAppStore(s => s.pendingApprovals);
   const approvedList = useAppStore(s => s.approvedList);
   const overtimeRecords = useAppStore(s => s.overtimeRecords);
+  const overtimeStatus = useAppStore(s => s.overtimeStatus);
+  const rescheduleRequests = useAppStore(s => s.rescheduleRequests);
   const approveNode = useAppStore(s => s.approveNode);
   const rejectNode = useAppStore(s => s.rejectNode);
   const checkAndHandleOvertime = useAppStore(s => s.checkAndHandleOvertime);
@@ -22,19 +25,23 @@ const ApprovalPage: React.FC = () => {
     return new Set(pendingApprovals.map(item => item.node.id));
   }, [pendingApprovals]);
   
+  const unhandledOvertimeRecords = useMemo(() => {
+    return overtimeRecords.filter(r => !overtimeStatus[r.id]?.handled);
+  }, [overtimeRecords, overtimeStatus]);
+  
   const overtimeNodeIds = useMemo(() => {
     const ids = new Set<string>();
-    overtimeRecords.forEach(record => {
+    unhandledOvertimeRecords.forEach(record => {
       if (pendingNodeIds.has(record.nodeId)) {
         ids.add(record.nodeId);
       }
     });
     return ids;
-  }, [overtimeRecords, pendingNodeIds]);
+  }, [unhandledOvertimeRecords, pendingNodeIds]);
   
   const overtimeBookings = useMemo(() => {
     const bookingMap = new Map<string, { count: number; escalated: boolean; records: typeof overtimeRecords }>();
-    overtimeRecords.forEach(record => {
+    unhandledOvertimeRecords.forEach(record => {
       if (!pendingNodeIds.has(record.nodeId)) return;
       if (!bookingMap.has(record.bookingId)) {
         bookingMap.set(record.bookingId, { count: 0, escalated: false, records: [] });
@@ -45,7 +52,13 @@ const ApprovalPage: React.FC = () => {
       data.records.push(record);
     });
     return bookingMap;
-  }, [overtimeRecords, pendingNodeIds]);
+  }, [unhandledOvertimeRecords, pendingNodeIds]);
+  
+  const getRescheduleInfo = useCallback((nodeId: string, bookingId: string) => {
+    if (!nodeId.startsWith('reschedule-node-')) return null;
+    const requestId = nodeId.replace('reschedule-node-', '');
+    return rescheduleRequests.find(r => r.id === requestId && r.bookingId === bookingId) || null;
+  }, [rescheduleRequests]);
   
   const overtimeCount = overtimeNodeIds.size;
   
@@ -197,15 +210,61 @@ const ApprovalPage: React.FC = () => {
         />
         
         {list.length > 0 ? (
-          list.map(item => (
-            <ApprovalCard 
-              key={item.id} 
-              approval={item}
-              showActions={activeTab === 'pending'}
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          ))
+          list.map(item => {
+            const reschedule = getRescheduleInfo(item.node.id, item.booking.id);
+            return (
+              <View key={item.id} style={{ marginBottom: '24rpx' }}>
+                <ApprovalCard 
+                  approval={item}
+                  showActions={activeTab === 'pending'}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                />
+                {reschedule && (
+                  <View style={{
+                    marginTop: '-12rpx',
+                    padding: '24rpx',
+                    paddingTop: '36rpx',
+                    background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.1) 0%, #ffffff 100%)',
+                    borderRadius: '0 0 20rpx 20rpx',
+                    border: '2rpx solid #fbbf24',
+                    borderTop: 'none'
+                  }}>
+                    <Text style={{
+                      fontSize: '26rpx',
+                      fontWeight: 600,
+                      color: '#d97706',
+                      display: 'block',
+                      marginBottom: '12rpx'
+                    }}>🔄 改期申请</Text>
+                    <View style={{ display: 'flex', gap: '16rpx', marginBottom: '8rpx' }}>
+                      <View style={{ flex: 1, background: '#fef3c7', padding: '12rpx', borderRadius: '8rpx' }}>
+                        <Text style={{ fontSize: '22rpx', color: '#92400e', display: 'block', marginBottom: '4rpx' }}>原时间</Text>
+                        <Text style={{ fontSize: '24rpx', color: '#78350f', fontWeight: 500 }}>
+                          {formatDateTime(reschedule.originalStartTime)}
+                        </Text>
+                        <Text style={{ fontSize: '22rpx', color: '#92400e' }}>
+                          ~ {formatDateTime(reschedule.originalEndTime)}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, background: '#dcfce7', padding: '12rpx', borderRadius: '8rpx' }}>
+                        <Text style={{ fontSize: '22rpx', color: '#166534', display: 'block', marginBottom: '4rpx' }}>新时间</Text>
+                        <Text style={{ fontSize: '24rpx', color: '#166534', fontWeight: 500 }}>
+                          {formatDateTime(reschedule.newStartTime)}
+                        </Text>
+                        <Text style={{ fontSize: '22rpx', color: '#166534' }}>
+                          ~ {formatDateTime(reschedule.newEndTime)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: '22rpx', color: '#64748b', marginTop: '4rpx' }}>
+                      原因: {reschedule.reason}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })
         ) : (
           <View className={styles.emptyState}>
             <View className={styles.emptyIcon}>

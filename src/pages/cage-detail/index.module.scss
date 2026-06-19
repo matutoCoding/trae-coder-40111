@@ -282,6 +282,170 @@
   color: $color-text-tertiary;
 }
 
+.viewTabs {
+  display: flex;
+  background-color: $color-bg-hover;
+  border-radius: $radius-md;
+  padding: 6rpx;
+  margin-bottom: $spacing-md;
+}
+
+.viewTab {
+  flex: 1;
+  padding: 16rpx 0;
+  text-align: center;
+  border-radius: $radius-sm;
+  transition: all $transition-base;
+  
+  text {
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+    font-weight: $font-weight-medium;
+  }
+  
+  &.active {
+    background-color: $color-bg-card;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+    
+    text {
+      color: $color-primary;
+      font-weight: $font-weight-semibold;
+    }
+  }
+}
+
+.dayNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+}
+
+.dayTitle {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.timelineWrap {
+  background-color: $color-bg-hover;
+  border-radius: $radius-md;
+  overflow: hidden;
+  padding: $spacing-md 0;
+}
+
+.timelineHourRow {
+  display: flex;
+  margin-bottom: 4rpx;
+  height: 48rpx;
+  align-items: center;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.timelineHourLabel {
+  width: 100rpx;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: $spacing-sm;
+  
+  text {
+    font-size: 20rpx;
+    color: $color-text-tertiary;
+  }
+}
+
+.timelineHourTrack {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  border-left: 1rpx solid rgba(148, 163, 184, 0.3);
+}
+
+.timelineBlock {
+  position: absolute;
+  top: 4rpx;
+  bottom: 4rpx;
+  border-radius: 6rpx;
+  padding: 4rpx 12rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  z-index: 1;
+  
+  &:active {
+    z-index: 2;
+  }
+}
+
+.timelineBlockLabel {
+  font-size: 20rpx;
+  font-weight: $font-weight-semibold;
+  color: $color-text-white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  display: block;
+}
+
+.timelineBlockSub {
+  font-size: 18rpx;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  display: block;
+}
+
+.timelineEmpty {
+  position: absolute;
+  top: 4rpx;
+  bottom: 4rpx;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timelineEmptyText {
+  font-size: 22rpx;
+  color: $color-text-tertiary;
+}
+
+.weekViewGrid {
+  display: flex;
+  flex-direction: column;
+}
+
+.weekDayColumnWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+  margin-bottom: $spacing-sm;
+}
+
+.weekDayLabel {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  padding: 8rpx 0 8rpx 100rpx;
+  display: block;
+  border-bottom: 2rpx solid rgba(148, 163, 184, 0.2);
+  margin-bottom: 8rpx;
+}
+
+.weekDayToday {
+  .weekDayLabel {
+    color: $color-primary;
+  }
+}
+
 .bookingList {
   display: flex;
   flex-direction: column;

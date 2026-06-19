@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Booking, FeedingRecord } from '@/types/booking';
-import type { ApprovalNode, ApprovalTrail, OvertimeRecord } from '@/types/approval';
+import type { ApprovalNode, ApprovalTrail, OvertimeRecord, RescheduleRequest } from '@/types/approval';
 import type { Cage } from '@/types/cage';
 import { myBookings as initBookings, feedingRecords as initFeeding } from '@/data/booking';
 import { pendingApprovals as initPending, myApproved as initApproved, overtimeRecords as initOvertime } from '@/data/approval';
@@ -30,6 +30,7 @@ interface AppState {
   overtimeStatus: Record<string, OvertimeStatus>;
   feedingRecords: FeedingRecord[];
   approvalTrails: Record<string, ApprovalTrail[]>;
+  rescheduleRequests: RescheduleRequest[];
   _overtimeHandled: Set<string>;
 
   addBooking: (booking: Booking) => void;
@@ -42,9 +43,22 @@ interface AppState {
   addFeedingRecord: (record: FeedingRecord) => void;
   checkAndHandleOvertime: () => void;
   syncCageState: () => void;
+  requestReschedule: (bookingId: string, newStartTime: string, newEndTime: string, reason: string) => boolean;
+  approveReschedule: (requestId: string, comment: string) => void;
+  rejectReschedule: (requestId: string, comment: string) => void;
   getCageOccupancy: (cageId: string) => Array<{
     startTime: string;
     endTime: string;
+    groupId: string;
+    groupName: string;
+    bookingId: string;
+    bookingStatus: string;
+  }>;
+  getOccupancyForDay: (cageId: string, dateStr: string) => Array<{
+    startTime: string;
+    endTime: string;
+    startHour: number;
+    endHour: number;
     groupId: string;
     groupName: string;
     bookingId: string;
@@ -270,6 +284,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   overtimeStatus: {},
   feedingRecords: initFeeding,
   approvalTrails: initTrails,
+  rescheduleRequests: [],
   _overtimeHandled: initOvertimeHandled,
 
   addBooking: (booking) => {
@@ -397,6 +412,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   approveNode: (nodeId, comment) => {
+    if (nodeId.startsWith('reschedule-node-')) {
+      const requestId = nodeId.replace('reschedule-node-', '');
+      get().approveReschedule(requestId, comment);
+      return;
+    }
+    
     set(state => {
       const targetIdx = state.pendingApprovals.findIndex(item => item.node.id === nodeId);
       if (targetIdx === -1) return state;
@@ -516,6 +537,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   rejectNode: (nodeId, comment) => {
+    if (nodeId.startsWith('reschedule-node-')) {
+      const requestId = nodeId.replace('reschedule-node-', '');
+      get().rejectReschedule(requestId, comment);
+      return;
+    }
+    
     set(state => {
       const targetIdx = state.pendingApprovals.findIndex(item => item.node.id === nodeId);
       if (targetIdx === -1) return state;
@@ -810,6 +837,181 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
+  requestReschedule: (bookingId, newStartTime, newEndTime, reason) => {
+    const state = get();
+    const booking = state.bookings.find(b => b.id === bookingId);
+    if (!booking) return false;
+    if (booking.status !== 'approved' && booking.status !== 'in_use' && booking.status !== 'pending') return false;
+
+    const startMs = new Date(newStartTime).getTime();
+    const endMs = new Date(newEndTime).getTime();
+    if (endMs <= startMs) return false;
+
+    if (state.checkConflict(booking.cageId, newStartTime, newEndTime, bookingId)) {
+      return false;
+    }
+
+    const now = new Date();
+    const requestId = `reschedule-${Date.now()}`;
+    const duration = Math.floor((endMs - startMs) / (1000 * 60 * 60));
+
+    const rescheduleNode: ApprovalNode = {
+      id: `reschedule-node-${requestId}`,
+      bookingId,
+      nodeType: 'lab_manager',
+      nodeName: '改期审批',
+      approverId: 'approver002',
+      approverName: '赵主任',
+      status: 'pending',
+      comment: '',
+      createdAt: now.toISOString(),
+      deadline: new Date(now.getTime() + 86400000).toISOString(),
+      isOvertime: false,
+      escalated: false
+    };
+
+    const request: RescheduleRequest = {
+      id: requestId,
+      bookingId,
+      originalStartTime: booking.startTime,
+      originalEndTime: booking.endTime,
+      newStartTime,
+      newEndTime,
+      newDuration: duration,
+      reason,
+      status: 'pending',
+      applicantId: currentUser.id,
+      applicantName: currentUser.name,
+      createdAt: now.toISOString()
+    };
+
+    const trail: ApprovalTrail = {
+      id: generateId(),
+      nodeId: rescheduleNode.id,
+      action: 'reschedule_request',
+      operatorId: currentUser.id,
+      operatorName: currentUser.name,
+      operatorRole: '申请人',
+      comment: `申请改期：原${booking.startTime}~${booking.endTime} → 新${newStartTime}~${newEndTime}。原因：${reason}`,
+      timestamp: now.toISOString()
+    };
+
+    set(s => ({
+      rescheduleRequests: [request, ...s.rescheduleRequests],
+      pendingApprovals: [{ node: rescheduleNode, booking }, ...s.pendingApprovals],
+      approvalTrails: {
+        ...s.approvalTrails,
+        [bookingId]: [...(s.approvalTrails[bookingId] || []), trail]
+      }
+    }));
+
+    return true;
+  },
+
+  approveReschedule: (requestId, comment) => {
+    set(state => {
+      const reqIdx = state.rescheduleRequests.findIndex(r => r.id === requestId);
+      if (reqIdx === -1) return state;
+
+      const req = state.rescheduleRequests[reqIdx];
+      const now = new Date();
+
+      const updatedBookings = state.bookings.map(b => {
+        if (b.id !== req.bookingId) return b;
+        return {
+          ...b,
+          startTime: req.newStartTime,
+          endTime: req.newEndTime,
+          duration: req.newDuration,
+          updatedAt: now.toISOString()
+        };
+      });
+
+      const updatedRequests = state.rescheduleRequests.map((r, i) => {
+        if (i !== reqIdx) return r;
+        return {
+          ...r,
+          status: 'approved' as const,
+          approverId: currentUser.id,
+          approverName: currentUser.name,
+          approvalComment: comment,
+          handledAt: now.toISOString()
+        };
+      });
+
+      const trail: ApprovalTrail = {
+        id: generateId(),
+        nodeId: 'reschedule',
+        action: 'reschedule_approve',
+        operatorId: currentUser.id,
+        operatorName: currentUser.name,
+        operatorRole: '审批人',
+        comment: `改期通过：${comment || '同意改期'}`,
+        timestamp: now.toISOString()
+      };
+
+      const newCages = computeCageState(state.cages, updatedBookings);
+      const { pending, approved } = syncBookingInApprovals(updatedBookings, state.pendingApprovals, state.approvedList);
+
+      return {
+        bookings: updatedBookings,
+        rescheduleRequests: updatedRequests,
+        cages: newCages,
+        pendingApprovals: pending.filter(p => p.node.id !== `reschedule-node-${requestId}`),
+        approvedList: approved,
+        approvalTrails: {
+          ...state.approvalTrails,
+          [req.bookingId]: [...(state.approvalTrails[req.bookingId] || []), trail]
+        }
+      };
+    });
+  },
+
+  rejectReschedule: (requestId, comment) => {
+    set(state => {
+      const reqIdx = state.rescheduleRequests.findIndex(r => r.id === requestId);
+      if (reqIdx === -1) return state;
+
+      const req = state.rescheduleRequests[reqIdx];
+      const now = new Date();
+
+      const updatedRequests = state.rescheduleRequests.map((r, i) => {
+        if (i !== reqIdx) return r;
+        return {
+          ...r,
+          status: 'rejected' as const,
+          approverId: currentUser.id,
+          approverName: currentUser.name,
+          approvalComment: comment,
+          handledAt: now.toISOString()
+        };
+      });
+
+      const trail: ApprovalTrail = {
+        id: generateId(),
+        nodeId: 'reschedule',
+        action: 'reschedule_reject',
+        operatorId: currentUser.id,
+        operatorName: currentUser.name,
+        operatorRole: '审批人',
+        comment: `改期拒绝：${comment || '不同意改期'}`,
+        timestamp: now.toISOString()
+      };
+
+      const { pending, approved } = syncBookingInApprovals(state.bookings, state.pendingApprovals, state.approvedList);
+
+      return {
+        rescheduleRequests: updatedRequests,
+        pendingApprovals: pending.filter(p => p.node.id !== `reschedule-node-${requestId}`),
+        approvedList: approved,
+        approvalTrails: {
+          ...state.approvalTrails,
+          [req.bookingId]: [...(state.approvalTrails[req.bookingId] || []), trail]
+        }
+      };
+    });
+  },
+
   getCageOccupancy: (cageId) => {
     const state = get();
     const occupancy: Array<{
@@ -822,7 +1024,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }> = [];
 
     const relevantBookings = state.bookings
-      .filter(b => b.cageId === cageId && (b.status === 'approved' || b.status === 'in_use' || b.status === 'pending' || b.status === 'completed'))
+      .filter(b => b.cageId === cageId && (b.status === 'approved' || b.status === 'in_use' || b.status === 'pending'))
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
     const groupMap = new Map<string, typeof occupancy>();
@@ -862,6 +1064,40 @@ export const useAppStore = create<AppState>((set, get) => ({
     return occupancy.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   },
 
+  getOccupancyForDay: (cageId, dateStr) => {
+    const state = get();
+    const dayStart = new Date(`${dateStr} 00:00:00`).getTime();
+    const dayEnd = new Date(`${dateStr} 23:59:59`).getTime();
+
+    const relevantBookings = state.bookings
+      .filter(b => {
+        if (b.cageId !== cageId) return false;
+        if (!(b.status === 'approved' || b.status === 'in_use' || b.status === 'pending')) return false;
+        const bStart = new Date(b.startTime).getTime();
+        const bEnd = new Date(b.endTime).getTime();
+        return bStart <= dayEnd && bEnd >= dayStart;
+      })
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+    return relevantBookings.map(b => {
+      const bStart = new Date(b.startTime);
+      const bEnd = new Date(b.endTime);
+      const startHour = bStart.getHours() + bStart.getMinutes() / 60;
+      const endHour = bEnd.getHours() + bEnd.getMinutes() / 60;
+
+      return {
+        startTime: b.startTime,
+        endTime: b.endTime,
+        startHour: Math.max(0, Math.min(24, startHour)),
+        endHour: Math.max(0, Math.min(24, endHour)),
+        groupId: b.groupId,
+        groupName: b.groupName,
+        bookingId: b.id,
+        bookingStatus: b.status
+      };
+    });
+  },
+
   checkConflict: (cageId, startTime, endTime, excludeBookingId) => {
     const state = get();
     const startMs = new Date(startTime).getTime();
@@ -872,7 +1108,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     return state.bookings.some(b => {
       if (excludeBookingId && b.id === excludeBookingId) return false;
       if (b.cageId !== cageId) return false;
-      if (b.status === 'cancelled' || b.status === 'rejected') return false;
+      if (!(b.status === 'approved' || b.status === 'in_use' || b.status === 'pending')) return false;
       
       const bStart = new Date(b.startTime).getTime();
       const bEnd = new Date(b.endTime).getTime();

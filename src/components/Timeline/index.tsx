@@ -13,7 +13,10 @@ const actionLabels: Record<string, string> = {
   approve: '审批通过',
   reject: '审批拒绝',
   escalate: '升级处理',
-  remind: '催办提醒'
+  remind: '催办提醒',
+  reschedule_request: '申请改期',
+  reschedule_approve: '改期通过',
+  reschedule_reject: '改期拒绝'
 };
 
 const actionColors: Record<string, string> = {
@@ -21,7 +24,10 @@ const actionColors: Record<string, string> = {
   approve: '#10b981',
   reject: '#ef4444',
   escalate: '#f59e0b',
-  remind: '#f59e0b'
+  remind: '#f59e0b',
+  reschedule_request: '#8b5cf6',
+  reschedule_approve: '#10b981',
+  reschedule_reject: '#ef4444'
 };
 
 const Timeline: React.FC<TimelineProps> = ({ trails }) => {

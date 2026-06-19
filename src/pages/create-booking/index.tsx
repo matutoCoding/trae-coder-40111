@@ -18,6 +18,7 @@ const CreateBookingPage: React.FC = () => {
   const paramCageId = router.params.cageId || '';
   const addBooking = useAppStore(s => s.addBooking);
   const getCageOccupancy = useAppStore(s => s.getCageOccupancy);
+  const getOccupancyForDay = useAppStore(s => s.getOccupancyForDay);
   const checkConflict = useAppStore(s => s.checkConflict);
   const bookings = useAppStore(s => s.bookings);
   
@@ -228,6 +229,122 @@ const CreateBookingPage: React.FC = () => {
           </View>
         </View>
       </View>
+      
+      {selectedCageId && startDate && (
+        <View className={styles.dayOccupySection}>
+          <View className={styles.sectionTitle}>
+            <Text>🕐 {startDate} 当天占用（选开始日期）</Text>
+          </View>
+          <View className={styles.compactTimeline}>
+            {(() => {
+              const dOcc = getOccupancyForDay(selectedCageId, startDate);
+              const hours = [6, 8, 10, 12, 14, 16, 18, 20, 22];
+              return (
+                <>
+                  <View className={styles.compactTrackRow}>
+                    <View className={styles.compactHourLabels}>
+                      {hours.map(h => <Text key={h} className={styles.compactHourText}>{h}:00</Text>)}
+                    </View>
+                    <View className={styles.compactTrack}>
+                      {dOcc.length === 0 ? (
+                        <View className={styles.compactEmpty}>
+                          <Text className={styles.compactEmptyText}>全天空闲 ✅</Text>
+                        </View>
+                      ) : dOcc.map((o, idx) => {
+                        const total = (22 - 6) * 60;
+                        const oS = new Date(o.startTime).getTime();
+                        const oE = new Date(o.endTime).getTime();
+                        const day6 = new Date(`${startDate} 06:00:00`).getTime();
+                        const day22 = new Date(`${startDate} 22:00:00`).getTime();
+                        const startMin = Math.max(0, (Math.max(oS, day6) - day6) / 60000);
+                        const endMin = Math.min(total, (Math.min(oE, day22) - day6) / 60000);
+                        const leftPct = (startMin / total) * 100;
+                        const widthPct = Math.max(2, ((endMin - startMin) / total) * 100);
+                        const color = o.groupId === currentUser.groupId
+                          ? { border: '#0ea5e9' }
+                          : { border: '#f59e0b' };
+                        return (
+                          <View
+                            key={`${o.bookingId}-${idx}`}
+                            className={styles.compactBlock}
+                            style={{
+                              left: `${leftPct}%`,
+                              width: `${widthPct}%`,
+                              backgroundColor: color.border
+                            }}
+                          >
+                            <Text className={styles.compactBlockText}>
+                              {o.groupName} {new Date(o.startTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}-{new Date(o.endTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      )}
+      
+      {selectedCageId && endDate && endDate !== startDate && (
+        <View className={styles.dayOccupySection}>
+          <View className={styles.sectionTitle}>
+            <Text>🕐 {endDate} 当天占用（选结束日期）</Text>
+          </View>
+          <View className={styles.compactTimeline}>
+            {(() => {
+              const dOcc = getOccupancyForDay(selectedCageId, endDate);
+              const hours = [6, 8, 10, 12, 14, 16, 18, 20, 22];
+              return (
+                <>
+                  <View className={styles.compactTrackRow}>
+                    <View className={styles.compactHourLabels}>
+                      {hours.map(h => <Text key={h} className={styles.compactHourText}>{h}:00</Text>)}
+                    </View>
+                    <View className={styles.compactTrack}>
+                      {dOcc.length === 0 ? (
+                        <View className={styles.compactEmpty}>
+                          <Text className={styles.compactEmptyText}>全天空闲 ✅</Text>
+                        </View>
+                      ) : dOcc.map((o, idx) => {
+                        const total = (22 - 6) * 60;
+                        const oS = new Date(o.startTime).getTime();
+                        const oE = new Date(o.endTime).getTime();
+                        const day6 = new Date(`${endDate} 06:00:00`).getTime();
+                        const day22 = new Date(`${endDate} 22:00:00`).getTime();
+                        const startMin = Math.max(0, (Math.max(oS, day6) - day6) / 60000);
+                        const endMin = Math.min(total, (Math.min(oE, day22) - day6) / 60000);
+                        const leftPct = (startMin / total) * 100;
+                        const widthPct = Math.max(2, ((endMin - startMin) / total) * 100);
+                        const color = o.groupId === currentUser.groupId
+                          ? { border: '#0ea5e9' }
+                          : { border: '#f59e0b' };
+                        return (
+                          <View
+                            key={`${o.bookingId}-${idx}`}
+                            className={styles.compactBlock}
+                            style={{
+                              left: `${leftPct}%`,
+                              width: `${widthPct}%`,
+                              backgroundColor: color.border
+                            }}
+                          >
+                            <Text className={styles.compactBlockText}>
+                              {o.groupName} {new Date(o.startTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}-{new Date(o.endTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      )}
       
       {selectedCageId && occupancy.length > 0 && (
         <View className={styles.occupySection}>

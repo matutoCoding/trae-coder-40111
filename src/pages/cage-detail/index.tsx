@@ -31,10 +31,13 @@ const CageDetailPage: React.FC = () => {
   const cages = useAppStore(s => s.cages);
   const bookings = useAppStore(s => s.bookings);
   const getCageOccupancy = useAppStore(s => s.getCageOccupancy);
+  const getOccupancyForDay = useAppStore(s => s.getOccupancyForDay);
   const checkConflict = useAppStore(s => s.checkConflict);
   const currentUser = { groupId: 'group001', groupName: '神经生物学课题组' };
   
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [viewMonth, setViewMonth] = useState(dayjs());
+  const [selectedDate, setSelectedDate] = useState(dayjs());
   
   const cage = useMemo(() => {
     return cages.find(c => c.id === cageId) || cages[0];
@@ -166,51 +169,235 @@ const CageDetailPage: React.FC = () => {
             </View>
           </View>
           
-          <View className={styles.calendarNav}>
-            <View className={styles.navBtn} onClick={handlePrevMonth}>
-              <Text className={styles.navBtnText}>‹</Text>
+          <View className={styles.viewTabs}>
+            <View className={`${styles.viewTab} ${viewMode === 'month' ? styles.active : ''}`} onClick={() => setViewMode('month')}>
+              <Text>月视图</Text>
             </View>
-            <Text className={styles.calendarTitle}>
-              {viewMonth.format('YYYY年MM月')}
-            </Text>
-            <View className={styles.navBtn} onClick={handleNextMonth}>
-              <Text className={styles.navBtnText}>›</Text>
+            <View className={`${styles.viewTab} ${viewMode === 'week' ? styles.active : ''}`} onClick={() => setViewMode('week')}>
+              <Text>周视图</Text>
+            </View>
+            <View className={`${styles.viewTab} ${viewMode === 'day' ? styles.active : ''}`} onClick={() => setViewMode('day')}>
+              <Text>日视图</Text>
             </View>
           </View>
           
-          <View className={styles.weekdayRow}>
-            {['日', '一', '二', '三', '四', '五', '六'].map(w => (
-              <Text key={w} className={styles.weekday}>{w}</Text>
-            ))}
-          </View>
+          {viewMode === 'month' && (
+            <>
+              <View className={styles.calendarNav}>
+                <View className={styles.navBtn} onClick={handlePrevMonth}>
+                  <Text className={styles.navBtnText}>‹</Text>
+                </View>
+                <Text className={styles.calendarTitle}>
+                  {viewMonth.format('YYYY年MM月')}
+                </Text>
+                <View className={styles.navBtn} onClick={handleNextMonth}>
+                  <Text className={styles.navBtnText}>›</Text>
+                </View>
+              </View>
+              
+              <View className={styles.weekdayRow}>
+                {['日', '一', '二', '三', '四', '五', '六'].map(w => (
+                  <Text key={w} className={styles.weekday}>{w}</Text>
+                ))}
+              </View>
+              
+              {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, rowIdx) => (
+                <View key={rowIdx} className={styles.dayRow}>
+                  {calendarDays.slice(rowIdx * 7, rowIdx * 7 + 7).map((day, cellIdx) => {
+                    if (!day.date) {
+                      return <View key={cellIdx} className={`${styles.dayCell} ${styles.dayEmpty}`} />;
+                    }
+                    
+                    const isToday = day.date.format('YYYY-MM-DD') === today;
+                    const dayBookingsGroups = new Set(day.bookings.map(b => b.groupId));
+                    
+                    return (
+                      <View
+                        key={cellIdx}
+                        className={`${styles.dayCell} ${isToday ? styles.dayToday : ''} ${day.bookings.length > 0 ? (day.hasConflict ? styles.dayHasConflict : styles.dayHasBooking) : ''}`}
+                        onClick={() => { setSelectedDate(day.date!); setViewMode('day'); }}
+                      >
+                        <Text className={styles.dayNumber}>{day.date.date()}</Text>
+                        <View className={styles.dayDots}>
+                          {Array.from(dayBookingsGroups).slice(0, 3).map(gid => {
+                            const color = getGroupColor(gid);
+                            return <View key={gid} className={styles.dayDot} style={{ backgroundColor: color.dot }} />;
+                          })}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+            </>
+          )}
           
-          {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, rowIdx) => (
-            <View key={rowIdx} className={styles.dayRow}>
-              {calendarDays.slice(rowIdx * 7, rowIdx * 7 + 7).map((day, cellIdx) => {
-                if (!day.date) {
-                  return <View key={cellIdx} className={`${styles.dayCell} ${styles.dayEmpty}`} />;
-                }
-                
-                const isToday = day.date.format('YYYY-MM-DD') === today;
-                const dayBookingsGroups = new Set(day.bookings.map(b => b.groupId));
-                
-                return (
-                  <View
-                    key={cellIdx}
-                    className={`${styles.dayCell} ${isToday ? styles.dayToday : ''} ${day.bookings.length > 0 ? (day.hasConflict ? styles.dayHasConflict : styles.dayHasBooking) : ''}`}
-                  >
-                    <Text className={styles.dayNumber}>{day.date.date()}</Text>
-                    <View className={styles.dayDots}>
-                      {Array.from(dayBookingsGroups).slice(0, 3).map(gid => {
-                        const color = getGroupColor(gid);
-                        return <View key={gid} className={styles.dayDot} style={{ backgroundColor: color.dot }} />;
-                      })}
+          {viewMode === 'week' && (
+            <>
+              <View className={styles.calendarNav}>
+                <View className={styles.navBtn} onClick={() => setSelectedDate(v => v.subtract(7, 'day'))}>
+                  <Text className={styles.navBtnText}>‹</Text>
+                </View>
+                <Text className={styles.calendarTitle}>
+                  {selectedDate.startOf('week').format('MM/DD')} ~ {selectedDate.endOf('week').format('MM/DD')}
+                </Text>
+                <View className={styles.navBtn} onClick={() => setSelectedDate(v => v.add(7, 'day'))}>
+                  <Text className={styles.navBtnText}>›</Text>
+                </View>
+              </View>
+              
+              <View className={styles.weekViewGrid}>
+                {Array.from({ length: 7 }).map((_, di) => {
+                  const d = selectedDate.startOf('week').add(di, 'day');
+                  const dStr = d.format('YYYY-MM-DD');
+                  const dOcc = cage ? getOccupancyForDay(cage.id, dStr) : [];
+                  const isToday = dStr === today;
+                  const hours = [6, 9, 12, 15, 18, 21];
+                  
+                  return (
+                    <View key={di} className={`${styles.weekDayColumnWrap} ${isToday ? styles.weekDayToday : ''}`}>
+                      <Text className={styles.weekDayLabel}>
+                        {['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.day()]} · {d.format('MM月DD日')}
+                        {dOcc.length > 0 && ` · ${dOcc.length}段`}
+                      </Text>
+                      <View style={{ paddingLeft: '0', position: 'relative' }}>
+                        {hours.map(h => {
+                          const hourStart = dStr + ' ' + String(h).padStart(2, '0') + ':00:00';
+                          const hourEnd = dStr + ' ' + String(h + 3).padStart(2, '0') + ':00:00';
+                          const hStartTs = new Date(hourStart).getTime();
+                          const hEndTs = new Date(hourEnd).getTime();
+                          const inHour = dOcc.filter(o => {
+                            const oS = new Date(o.startTime).getTime();
+                            const oE = new Date(o.endTime).getTime();
+                            return hStartTs < oE && hEndTs > oS;
+                          });
+                          
+                          return (
+                            <View key={h} className={styles.timelineHourRow}>
+                              <View className={styles.timelineHourLabel}>
+                                <Text>{String(h).padStart(2, '0')}:00</Text>
+                              </View>
+                              <View className={styles.timelineHourTrack}>
+                                {inHour.length === 0 ? (
+                                  <View className={styles.timelineEmpty}>
+                                    <Text className={styles.timelineEmptyText}>空闲</Text>
+                                  </View>
+                                ) : (
+                                  inHour.map((o, idx) => {
+                                    const color = getGroupColor(o.groupId);
+                                    const oS = new Date(o.startTime).getTime();
+                                    const oE = new Date(o.endTime).getTime();
+                                    const pctStart = Math.max(0, ((Math.max(oS, hStartTs) - hStartTs) / (hEndTs - hStartTs)) * 100);
+                                    const pctEnd = Math.min(100, ((Math.min(oE, hEndTs) - hStartTs) / (hEndTs - hStartTs)) * 100);
+                                    return (
+                                      <View
+                                        key={`${o.bookingId}-${idx}`}
+                                        className={styles.timelineBlock}
+                                        style={{
+                                          left: `${pctStart}%`,
+                                          width: `${pctEnd - pctStart}%`,
+                                          backgroundColor: color.border
+                                        }}
+                                      >
+                                        <Text className={styles.timelineBlockLabel}>{o.groupName}</Text>
+                                        <Text className={styles.timelineBlockSub}>
+                                          {o.bookingStatus === 'pending' ? '待审' : o.bookingStatus === 'approved' ? '已通过' : '使用中'}
+                                        </Text>
+                                      </View>
+                                    );
+                                  })
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
                     </View>
-                  </View>
-                );
-              })}
-            </View>
-          ))}
+                  );
+                })}
+              </View>
+            </>
+          )}
+          
+          {viewMode === 'day' && (
+            <>
+              <View className={styles.calendarNav}>
+                <View className={styles.navBtn} onClick={() => setSelectedDate(v => v.subtract(1, 'day'))}>
+                  <Text className={styles.navBtnText}>‹</Text>
+                </View>
+                <Text className={styles.calendarTitle}>
+                  {selectedDate.format('YYYY年MM月DD日')}
+                  {today === selectedDate.format('YYYY-MM-DD') ? '（今天）' : ''}
+                </Text>
+                <View className={styles.navBtn} onClick={() => setSelectedDate(v => v.add(1, 'day'))}>
+                  <Text className={styles.navBtnText}>›</Text>
+                </View>
+              </View>
+              
+              <View className={styles.timelineWrap}>
+                {(() => {
+                  const dStr = selectedDate.format('YYYY-MM-DD');
+                  const dOcc = cage ? getOccupancyForDay(cage.id, dStr) : [];
+                  const hours = Array.from({ length: 24 }, (_, i) => i);
+                  
+                  return hours.map(h => {
+                    const hourStart = `${dStr} ${String(h).padStart(2, '0')}:00:00`;
+                    const hourEnd = `${dStr} ${String(h + 1).padStart(2, '0')}:00:00`;
+                    const hStartTs = new Date(hourStart).getTime();
+                    const hEndTs = new Date(hourEnd).getTime();
+                    const inHour = dOcc.filter(o => {
+                      const oS = new Date(o.startTime).getTime();
+                      const oE = new Date(o.endTime).getTime();
+                      return hStartTs < oE && hEndTs > oS;
+                    });
+                    
+                    return (
+                      <View key={h} className={styles.timelineHourRow}>
+                        <View className={styles.timelineHourLabel}>
+                          <Text>{String(h).padStart(2, '0')}:00</Text>
+                        </View>
+                        <View className={styles.timelineHourTrack}>
+                          {inHour.length === 0 ? (
+                            <View className={styles.timelineEmpty}>
+                              <Text className={styles.timelineEmptyText}>{(h >= 8 && h < 20) ? '空闲' : ''}</Text>
+                            </View>
+                          ) : (
+                            inHour.map((o, idx) => {
+                              const color = getGroupColor(o.groupId);
+                              const oS = new Date(o.startTime).getTime();
+                              const oE = new Date(o.endTime).getTime();
+                              const pctStart = Math.max(0, ((Math.max(oS, hStartTs) - hStartTs) / (hEndTs - hStartTs)) * 100);
+                              const pctEnd = Math.min(100, ((Math.min(oE, hEndTs) - hStartTs) / (hEndTs - hStartTs)) * 100);
+                              return (
+                                <View
+                                  key={`${o.bookingId}-${idx}`}
+                                  className={styles.timelineBlock}
+                                  style={{
+                                    left: `${pctStart}%`,
+                                    width: `${pctEnd - pctStart}%`,
+                                    backgroundColor: color.border
+                                  }}
+                                >
+                                  {pctEnd - pctStart > 18 && (
+                                    <>
+                                      <Text className={styles.timelineBlockLabel}>{o.groupName}</Text>
+                                      <Text className={styles.timelineBlockSub}>
+                                        {new Date(o.startTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} - {new Date(o.endTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                                      </Text>
+                                    </>
+                                  )}
+                                </View>
+                              );
+                            })
+                          )}
+                        </View>
+                      </View>
+                    );
+                  });
+                })()}
+              </View>
+            </>
+          )}
           
           {uniqueGroups.size > 0 && (
             <View className={styles.legendRow}>

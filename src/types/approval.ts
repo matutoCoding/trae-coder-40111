@@ -22,7 +22,7 @@ export interface ApprovalNode {
 export interface ApprovalTrail {
   id: string;
   nodeId: string;
-  action: 'submit' | 'approve' | 'reject' | 'escalate' | 'remind';
+  action: 'submit' | 'approve' | 'reject' | 'escalate' | 'remind' | 'reschedule_request' | 'reschedule_approve' | 'reschedule_reject';
   operatorId: string;
   operatorName: string;
   operatorRole: string;
@@ -41,4 +41,25 @@ export interface OvertimeRecord {
   escalated: boolean;
   responsiblePerson: string;
   responsiblePersonName: string;
+}
+
+export type RescheduleStatus = 'pending' | 'approved' | 'rejected';
+
+export interface RescheduleRequest {
+  id: string;
+  bookingId: string;
+  originalStartTime: string;
+  originalEndTime: string;
+  newStartTime: string;
+  newEndTime: string;
+  newDuration: number;
+  reason: string;
+  status: RescheduleStatus;
+  approverId?: string;
+  approverName?: string;
+  approvalComment?: string;
+  applicantId: string;
+  applicantName: string;
+  createdAt: string;
+  handledAt?: string;
 }

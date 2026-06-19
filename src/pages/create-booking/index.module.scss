@@ -14,6 +14,86 @@
   box-shadow: $shadow-card;
 }
 
+.dayOccupySection {
+  margin: $spacing-md $page-padding;
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+}
+
+.compactTimeline {
+  margin-top: $spacing-xs;
+  background-color: $color-bg-hover;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+}
+
+.compactTrackRow {
+  display: flex;
+  flex-direction: column;
+}
+
+.compactHourLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+  padding: 0 4rpx;
+}
+
+.compactHourText {
+  font-size: 20rpx;
+  color: $color-text-tertiary;
+}
+
+.compactTrack {
+  height: 64rpx;
+  background-color: rgba(148, 163, 184, 0.12);
+  border-radius: $radius-md;
+  position: relative;
+  overflow: hidden;
+  border: 1rpx dashed rgba(148, 163, 184, 0.3);
+}
+
+.compactEmpty {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compactEmptyText {
+  font-size: $font-size-sm;
+  color: $color-success;
+  font-weight: $font-weight-medium;
+}
+
+.compactBlock {
+  position: absolute;
+  top: 6rpx;
+  bottom: 6rpx;
+  border-radius: 6rpx;
+  padding: 0 12rpx;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  min-width: 80rpx;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
+}
+
+.compactBlockText {
+  font-size: 20rpx;
+  color: $color-text-white;
+  font-weight: $font-weight-semibold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sectionTitle {
   font-size: $font-size-md;
   font-weight: $font-weight-semibold;
