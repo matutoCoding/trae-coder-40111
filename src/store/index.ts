@@ -17,6 +17,7 @@ interface AppState {
   overtimeRecords: OvertimeRecord[];
   feedingRecords: FeedingRecord[];
   approvalTrails: Record<string, ApprovalTrail[]>;
+  _overtimeHandled: Set<string>;
 
   addBooking: (booking: Booking) => void;
   cancelBooking: (bookingId: string, splitTime?: string) => void;
@@ -92,6 +93,40 @@ initPending.forEach(item => {
   }
 });
 
+const initOvertimeHandled = new Set<string>();
+initOvertime.forEach(record => {
+  const key = `${record.nodeId}-l${record.level}`;
+  initOvertimeHandled.add(key);
+});
+
+const syncBookingInApprovals = (bookings: Booking[], pending: ApprovalItem[], approved: ApprovalItem[]): { pending: ApprovalItem[]; approved: ApprovalItem[] } => {
+  const newPending = pending.map(item => {
+    const freshBooking = bookings.find(b => b.id === item.booking.id);
+    if (freshBooking) {
+      const freshNode = freshBooking.approvalNodes.find(n => n.id === item.node.id);
+      return {
+        node: freshNode || item.node,
+        booking: freshBooking
+      };
+    }
+    return item;
+  });
+
+  const newApproved = approved.map(item => {
+    const freshBooking = bookings.find(b => b.id === item.booking.id);
+    if (freshBooking) {
+      const freshNode = freshBooking.approvalNodes.find(n => n.id === item.node.id);
+      return {
+        node: freshNode || item.node,
+        booking: freshBooking
+      };
+    }
+    return item;
+  });
+
+  return { pending: newPending, approved: newApproved };
+};
+
 export const useAppStore = create<AppState>((set, get) => ({
   bookings: initBookings,
   pendingApprovals: initPending.map(item => ({ node: item, booking: item.booking })),
@@ -99,6 +134,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   overtimeRecords: initOvertime,
   feedingRecords: initFeeding,
   approvalTrails: initTrails,
+  _overtimeHandled: initOvertimeHandled,
 
   addBooking: (booking) => {
     const nodes = buildApprovalNodes(booking.id);
@@ -158,6 +194,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const existingTrails = state.approvalTrails[bookingId] || [];
 
+      let finalBookings: Booking[] = state.bookings;
+      const newTrails = { ...state.approvalTrails, [bookingId]: [...existingTrails, cancelTrail] };
+
       if (splitTime && booking.status === 'in_use') {
         const startMs = new Date(booking.startTime).getTime();
         const endMs = new Date(booking.endTime).getTime();
@@ -166,17 +205,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (splitMs > startMs && splitMs < endMs) {
           const firstDuration = Math.floor((splitMs - startMs) / (1000 * 60 * 60));
           const secondDuration = Math.floor((endMs - splitMs) / (1000 * 60 * 60));
-
-          const firstBooking: Booking = {
-            ...booking,
-            id: `${booking.id}-part1`,
-            endTime: splitTime,
-            duration: firstDuration,
-            status: 'completed',
-            isMerged: false,
-            mergedFrom: undefined,
-            updatedAt: now.toISOString()
-          };
 
           const secondBooking: Booking = {
             ...booking,
@@ -190,37 +218,40 @@ export const useAppStore = create<AppState>((set, get) => ({
             updatedAt: now.toISOString()
           };
 
-          const newBookings = state.bookings.map(b => {
+          finalBookings = state.bookings.map(b => {
             if (b.id === bookingId) {
               return { ...b, status: 'completed' as const, endTime: splitTime, duration: firstDuration, updatedAt: now.toISOString() };
             }
             return b;
           });
+          finalBookings = [...finalBookings, secondBooking];
+          newTrails[`${booking.id}-part2`] = [cancelTrail];
+
+          const { pending, approved } = syncBookingInApprovals(finalBookings, state.pendingApprovals, state.approvedList);
 
           return {
-            bookings: [...newBookings, secondBooking],
-            approvalTrails: {
-              ...state.approvalTrails,
-              [bookingId]: [...existingTrails, cancelTrail],
-              [`${booking.id}-part2`]: [cancelTrail]
-            }
+            bookings: finalBookings,
+            pendingApprovals: pending.filter(item => item.booking.id !== bookingId && item.booking.id !== `${booking.id}-part2`),
+            approvedList: approved,
+            approvalTrails: newTrails
           };
         }
       }
 
-      const newBookings = state.bookings.map(b => {
+      finalBookings = state.bookings.map(b => {
         if (b.id === bookingId) {
           return { ...b, status: 'cancelled' as const, updatedAt: now.toISOString() };
         }
         return b;
       });
 
+      const { pending, approved } = syncBookingInApprovals(finalBookings, state.pendingApprovals, state.approvedList);
+
       return {
-        bookings: newBookings,
-        approvalTrails: {
-          ...state.approvalTrails,
-          [bookingId]: [...existingTrails, cancelTrail]
-        }
+        bookings: finalBookings,
+        pendingApprovals: pending.filter(item => item.booking.id !== bookingId),
+        approvedList: approved,
+        approvalTrails: newTrails
       };
     });
   },
@@ -232,9 +263,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const target = state.pendingApprovals[targetIdx];
       const now = new Date();
+      const bookingId = target.node.bookingId;
+
+      const bookingIdx = state.bookings.findIndex(b => b.id === bookingId);
+      if (bookingIdx === -1) return state;
+
+      const booking = state.bookings[bookingIdx];
+      const currentNodeIdx = booking.approvalNodes.findIndex(n => n.id === nodeId);
+      if (currentNodeIdx === -1) return state;
 
       const approvedNode: ApprovalNode = {
-        ...target.node,
+        ...booking.approvalNodes[currentNodeIdx],
         status: 'approved',
         comment,
         handledAt: now.toISOString()
@@ -242,66 +281,74 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const trail: ApprovalTrail = {
         id: generateId(),
-        nodeId: target.node.id,
+        nodeId,
         action: 'approve',
-        operatorId: target.node.approverId,
-        operatorName: target.node.approverName,
-        operatorRole: target.node.nodeName,
+        operatorId: approvedNode.approverId,
+        operatorName: approvedNode.approverName,
+        operatorRole: approvedNode.nodeName,
         comment,
         timestamp: now.toISOString()
       };
 
-      const bookingId = target.node.bookingId;
-      const existingTrails = state.approvalTrails[bookingId] || [];
+      const updatedNodes = booking.approvalNodes.map(n =>
+        n.id === nodeId ? approvedNode : n
+      );
 
-      const bookingIdx = state.bookings.findIndex(b => b.id === bookingId);
-      let updatedBookings = [...state.bookings];
-      let updatedBooking = target.booking;
+      const isLastNode = currentNodeIdx === booking.approvalNodes.length - 1;
 
-      if (bookingIdx !== -1) {
-        const currentNodeIdx = updatedBooking.approvalNodes.findIndex(n => n.id === nodeId);
-        const isLastNode = currentNodeIdx >= 0 && currentNodeIdx === updatedBooking.approvalNodes.length - 1;
+      let updatedBooking: Booking;
+      if (isLastNode) {
+        updatedBooking = {
+          ...booking,
+          status: 'approved',
+          approvalNodes: updatedNodes,
+          currentApprovalNode: booking.approvalNodes.length,
+          updatedAt: now.toISOString()
+        };
+      } else {
+        const nextNode = { ...updatedNodes[currentNodeIdx + 1] };
+        nextNode.createdAt = now.toISOString();
+        nextNode.deadline = new Date(now.getTime() + 86400000).toISOString();
+        updatedNodes[currentNodeIdx + 1] = nextNode;
 
-        const updatedNodes = updatedBooking.approvalNodes.map(n =>
-          n.id === nodeId ? approvedNode : n
-        );
-
-        if (isLastNode) {
-          updatedBooking = {
-            ...updatedBooking,
-            status: 'approved',
-            approvalNodes: updatedNodes,
-            currentApprovalNode: updatedBooking.approvalNodes.length,
-            updatedAt: now.toISOString()
-          };
-        } else {
-          const nextNodeIdx = (currentNodeIdx >= 0 ? currentNodeIdx : 0) + 1;
-          updatedBooking = {
-            ...updatedBooking,
-            approvalNodes: updatedNodes,
-            currentApprovalNode: nextNodeIdx + 1,
-            updatedAt: now.toISOString()
-          };
-        }
-
-        updatedBookings[bookingIdx] = updatedBooking;
+        updatedBooking = {
+          ...booking,
+          approvalNodes: updatedNodes,
+          currentApprovalNode: currentNodeIdx + 2,
+          updatedAt: now.toISOString()
+        };
       }
+
+      const updatedBookings = state.bookings.map((b, i) =>
+        i === bookingIdx ? updatedBooking : b
+      );
 
       const remainingPending = state.pendingApprovals.filter((_, i) => i !== targetIdx);
 
-      const newPending = remainingPending.map(item => {
-        if (item.booking.id === bookingId) {
-          return { ...item, booking: updatedBooking };
-        }
-        return item;
-      });
+      let newPending = [...remainingPending];
+      if (!isLastNode) {
+        const nextNode = updatedBooking.approvalNodes[currentNodeIdx + 1];
+        const nextPendingItem: ApprovalItem = {
+          node: nextNode,
+          booking: updatedBooking
+        };
+        newPending = [nextPendingItem, ...newPending];
+      }
 
-      const isLastApprovalForBooking = !newPending.some(item => item.booking.id === bookingId);
+      const newApproved = [{ node: approvedNode, booking: updatedBooking }, ...state.approvedList];
+
+      const existingTrails = state.approvalTrails[bookingId] || [];
+
+      const { pending: syncedPending, approved: syncedApproved } = syncBookingInApprovals(
+        updatedBookings,
+        newPending,
+        newApproved
+      );
 
       return {
         bookings: updatedBookings,
-        pendingApprovals: newPending,
-        approvedList: [{ node: approvedNode, booking: updatedBooking }, ...state.approvedList],
+        pendingApprovals: syncedPending,
+        approvedList: syncedApproved,
         approvalTrails: {
           ...state.approvalTrails,
           [bookingId]: [...existingTrails, trail]
@@ -317,6 +364,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const target = state.pendingApprovals[targetIdx];
       const now = new Date();
+      const bookingId = target.node.bookingId;
+
+      const bookingIdx = state.bookings.findIndex(b => b.id === bookingId);
+      if (bookingIdx === -1) return state;
+
+      const booking = state.bookings[bookingIdx];
 
       const rejectedNode: ApprovalNode = {
         ...target.node,
@@ -327,38 +380,45 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const trail: ApprovalTrail = {
         id: generateId(),
-        nodeId: target.node.id,
+        nodeId,
         action: 'reject',
-        operatorId: target.node.approverId,
-        operatorName: target.node.approverName,
-        operatorRole: target.node.nodeName,
+        operatorId: rejectedNode.approverId,
+        operatorName: rejectedNode.approverName,
+        operatorRole: rejectedNode.nodeName,
         comment,
         timestamp: now.toISOString()
       };
 
-      const bookingId = target.node.bookingId;
+      const updatedNodes = booking.approvalNodes.map(n =>
+        n.id === nodeId ? rejectedNode : n
+      );
+
+      const updatedBooking: Booking = {
+        ...booking,
+        status: 'rejected',
+        approvalNodes: updatedNodes,
+        updatedAt: now.toISOString()
+      };
+
+      const updatedBookings = state.bookings.map((b, i) =>
+        i === bookingIdx ? updatedBooking : b
+      );
+
+      const newPending = state.pendingApprovals.filter(item => item.booking.id !== bookingId);
+      const newApproved = [{ node: rejectedNode, booking: updatedBooking }, ...state.approvedList];
+
       const existingTrails = state.approvalTrails[bookingId] || [];
 
-      const bookingIdx = state.bookings.findIndex(b => b.id === bookingId);
-      let updatedBookings = [...state.bookings];
-
-      if (bookingIdx !== -1) {
-        updatedBookings[bookingIdx] = {
-          ...updatedBookings[bookingIdx],
-          status: 'rejected',
-          updatedAt: now.toISOString(),
-          approvalNodes: updatedBookings[bookingIdx].approvalNodes.map(n =>
-            n.id === nodeId ? rejectedNode : n
-          )
-        };
-      }
-
-      const remainingPending = state.pendingApprovals.filter(item => item.booking.id !== bookingId);
+      const { pending: syncedPending, approved: syncedApproved } = syncBookingInApprovals(
+        updatedBookings,
+        newPending,
+        newApproved
+      );
 
       return {
         bookings: updatedBookings,
-        pendingApprovals: remainingPending,
-        approvedList: [{ node: rejectedNode, booking: state.bookings.find(b => b.id === bookingId) || target.booking }, ...state.approvedList],
+        pendingApprovals: syncedPending,
+        approvedList: syncedApproved,
         approvalTrails: {
           ...state.approvalTrails,
           [bookingId]: [...existingTrails, trail]
@@ -395,64 +455,138 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     const now = new Date();
 
+    const newOvertimeRecords: OvertimeRecord[] = [];
+    const newTrails: Record<string, ApprovalTrail[]> = {};
+    const newHandled = new Set(state._overtimeHandled);
+    const updatedNodes: Record<string, { isOvertime: boolean; escalated: boolean }> = {};
+
     state.pendingApprovals.forEach(item => {
+      const nodeId = item.node.id;
+      const bookingId = item.node.bookingId;
       const deadline = new Date(item.node.deadline);
-      if (now > deadline && !item.node.isOvertime) {
+
+      if (now <= deadline) return;
+
+      let nodeUpdated = false;
+      let updated = updatedNodes[nodeId] || { isOvertime: item.node.isOvertime, escalated: item.node.escalated };
+
+      const remindKey = `${nodeId}-l1`;
+      if (!newHandled.has(remindKey)) {
+        newHandled.add(remindKey);
+        updated.isOvertime = true;
+        nodeUpdated = true;
+
         const overtimeRecord: OvertimeRecord = {
           id: generateId(),
-          nodeId: item.node.id,
-          bookingId: item.node.bookingId,
+          nodeId,
+          bookingId,
           deadline: item.node.deadline,
-          overtimeAt: now.toISOString(),
+          overtimeAt: deadline.toISOString(),
           level: 1,
           reminded: true,
           escalated: false,
           responsiblePerson: item.node.approverId,
           responsiblePersonName: item.node.approverName
         };
-        get().addOvertimeRecord(overtimeRecord);
+        newOvertimeRecords.push(overtimeRecord);
 
         const remindTrail: ApprovalTrail = {
           id: generateId(),
-          nodeId: item.node.id,
+          nodeId,
           action: 'remind',
           operatorId: 'system',
           operatorName: '系统',
           operatorRole: '超时催办',
           comment: `${item.node.approverName} 审批超时，已自动催办`,
-          timestamp: now.toISOString()
+          timestamp: deadline.toISOString()
         };
-        get().addApprovalTrail(item.node.bookingId, remindTrail);
+        if (!newTrails[bookingId]) newTrails[bookingId] = [];
+        newTrails[bookingId].push(remindTrail);
+      }
 
-        const overtimeMs = now.getTime() - deadline.getTime();
-        if (overtimeMs > 86400000) {
-          const escalateRecord: OvertimeRecord = {
-            id: generateId(),
-            nodeId: item.node.id,
-            bookingId: item.node.bookingId,
-            deadline: item.node.deadline,
-            overtimeAt: now.toISOString(),
-            level: 2,
-            reminded: true,
-            escalated: true,
-            responsiblePerson: item.node.approverId,
-            responsiblePersonName: item.node.approverName
-          };
-          get().addOvertimeRecord(escalateRecord);
+      const overtimeMs = now.getTime() - deadline.getTime();
+      const escalateKey = `${nodeId}-l2`;
+      if (overtimeMs > 86400000 && !newHandled.has(escalateKey)) {
+        newHandled.add(escalateKey);
+        updated.escalated = true;
+        nodeUpdated = true;
 
-          const escalateTrail: ApprovalTrail = {
-            id: generateId(),
-            nodeId: item.node.id,
-            action: 'escalate',
-            operatorId: 'system',
-            operatorName: '系统',
-            operatorRole: '自动升级',
-            comment: `超时超过24小时，已自动升级至上级负责人处理，责任人：${item.node.approverName}`,
-            timestamp: now.toISOString()
-          };
-          get().addApprovalTrail(item.node.bookingId, escalateTrail);
-        }
+        const escalateRecord: OvertimeRecord = {
+          id: generateId(),
+          nodeId,
+          bookingId,
+          deadline: item.node.deadline,
+          overtimeAt: new Date(deadline.getTime() + 86400000).toISOString(),
+          level: 2,
+          reminded: true,
+          escalated: true,
+          responsiblePerson: item.node.approverId,
+          responsiblePersonName: item.node.approverName
+        };
+        newOvertimeRecords.push(escalateRecord);
+
+        const escalateTrail: ApprovalTrail = {
+          id: generateId(),
+          nodeId,
+          action: 'escalate',
+          operatorId: 'system',
+          operatorName: '系统',
+          operatorRole: '自动升级',
+          comment: `超时超过24小时，已自动升级至上级负责人处理，责任人：${item.node.approverName}`,
+          timestamp: new Date(deadline.getTime() + 86400000).toISOString()
+        };
+        if (!newTrails[bookingId]) newTrails[bookingId] = [];
+        newTrails[bookingId].push(escalateTrail);
+      }
+
+      if (nodeUpdated) {
+        updatedNodes[nodeId] = updated;
       }
     });
+
+    if (newOvertimeRecords.length > 0 || Object.keys(updatedNodes).length > 0) {
+      set(currentState => {
+        const mergedTrails = { ...currentState.approvalTrails };
+        Object.keys(newTrails).forEach(bid => {
+          const existing = mergedTrails[bid] || [];
+          mergedTrails[bid] = [...existing, ...newTrails[bid]];
+        });
+
+        const updatedBookings = currentState.bookings.map(b => {
+          const hasUpdates = b.approvalNodes.some(n => updatedNodes[n.id]);
+          if (!hasUpdates) return b;
+          return {
+            ...b,
+            approvalNodes: b.approvalNodes.map(n => {
+              const upd = updatedNodes[n.id];
+              if (upd) {
+                return { ...n, isOvertime: upd.isOvertime, escalated: upd.escalated };
+              }
+              return n;
+            })
+          };
+        });
+
+        const updatedPending = currentState.pendingApprovals.map(item => {
+          const upd = updatedNodes[item.node.id];
+          if (upd) {
+            const freshBooking = updatedBookings.find(b => b.id === item.booking.id) || item.booking;
+            return {
+              node: { ...item.node, isOvertime: upd.isOvertime, escalated: upd.escalated },
+              booking: freshBooking
+            };
+          }
+          return item;
+        });
+
+        return {
+          bookings: updatedBookings,
+          pendingApprovals: updatedPending,
+          overtimeRecords: [...newOvertimeRecords, ...currentState.overtimeRecords],
+          approvalTrails: mergedTrails,
+          _overtimeHandled: newHandled
+        };
+      });
+    }
   }
 }));

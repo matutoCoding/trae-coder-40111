@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import ApprovalCard from '@/components/ApprovalCard';
@@ -18,9 +18,40 @@ const ApprovalPage: React.FC = () => {
   const rejectNode = useAppStore(s => s.rejectNode);
   const checkAndHandleOvertime = useAppStore(s => s.checkAndHandleOvertime);
   
-  const overtimeCount = useMemo(() => {
-    return pendingApprovals.filter(a => a.node.isOvertime || a.node.escalated).length;
+  const pendingNodeIds = useMemo(() => {
+    return new Set(pendingApprovals.map(item => item.node.id));
   }, [pendingApprovals]);
+  
+  const overtimeNodeIds = useMemo(() => {
+    const ids = new Set<string>();
+    overtimeRecords.forEach(record => {
+      if (pendingNodeIds.has(record.nodeId)) {
+        ids.add(record.nodeId);
+      }
+    });
+    return ids;
+  }, [overtimeRecords, pendingNodeIds]);
+  
+  const overtimeBookings = useMemo(() => {
+    const bookingMap = new Map<string, { count: number; escalated: boolean; records: typeof overtimeRecords }>();
+    overtimeRecords.forEach(record => {
+      if (!pendingNodeIds.has(record.nodeId)) return;
+      if (!bookingMap.has(record.bookingId)) {
+        bookingMap.set(record.bookingId, { count: 0, escalated: false, records: [] });
+      }
+      const data = bookingMap.get(record.bookingId)!;
+      data.count++;
+      if (record.escalated) data.escalated = true;
+      data.records.push(record);
+    });
+    return bookingMap;
+  }, [overtimeRecords, pendingNodeIds]);
+  
+  const overtimeCount = overtimeNodeIds.size;
+  
+  useEffect(() => {
+    checkAndHandleOvertime();
+  }, [checkAndHandleOvertime]);
   
   const handleRefresh = () => {
     console.log('[ApprovalPage] 下拉刷新');
@@ -70,17 +101,36 @@ const ApprovalPage: React.FC = () => {
     });
   };
   
-  const pendingList = pendingApprovals.map(item => ({
-    ...item.node,
-    booking: item.booking
-  }));
+  const pendingList = useMemo(() => {
+    return pendingApprovals.map(item => ({
+      ...item.node,
+      booking: item.booking,
+      isOvertime: overtimeNodeIds.has(item.node.id)
+    }));
+  }, [pendingApprovals, overtimeNodeIds]);
   
-  const approvedItems = approvedList.map(item => ({
-    ...item.node,
-    booking: item.booking
-  }));
+  const approvedItems = useMemo(() => {
+    return approvedList.map(item => ({
+      ...item.node,
+      booking: item.booking
+    }));
+  }, [approvedList]);
   
   const list = activeTab === 'pending' ? pendingList : approvedItems;
+  
+  const recentOvertimeRecords = useMemo(() => {
+    const seen = new Set<string>();
+    const result: typeof overtimeRecords = [];
+    for (const record of overtimeRecords) {
+      if (!pendingNodeIds.has(record.nodeId)) continue;
+      const key = `${record.nodeId}-${record.level}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(record);
+      if (result.length >= 4) break;
+    }
+    return result;
+  }, [overtimeRecords, pendingNodeIds]);
   
   return (
     <ScrollView
@@ -102,20 +152,20 @@ const ApprovalPage: React.FC = () => {
               <Text className={styles.alertTitle}>
                 ⚠️ 超时提醒
               </Text>
-              <Text className={styles.alertCount}>{overtimeCount} 条</Text>
+              <Text className={styles.alertCount}>{overtimeCount} 个节点</Text>
             </View>
             <Text className={styles.alertDesc}>
-              有 {overtimeCount} 条审批已超时，请尽快处理
+              有 {overtimeCount} 个审批节点已超时，请尽快处理
             </Text>
-            {overtimeRecords.length > 0 && (
+            {recentOvertimeRecords.length > 0 && (
               <View style={{ marginTop: '16rpx' }}>
-                {overtimeRecords.slice(0, 3).map(record => (
-                  <View key={record.id} style={{ marginBottom: '8rpx', display: 'flex', justifyContent: 'space-between' }}>
+                {recentOvertimeRecords.map(record => (
+                  <View key={`${record.nodeId}-${record.level}`} style={{ marginBottom: '8rpx', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={{ fontSize: '24rpx', color: '#94a3b8' }}>
                       责任人: {record.responsiblePersonName}
                     </Text>
-                    <Text style={{ fontSize: '24rpx', color: record.escalated ? '#ef4444' : '#f59e0b' }}>
-                      {record.escalated ? `已升级(L${record.level})` : `已催办(L${record.level})`}
+                    <Text style={{ fontSize: '24rpx', color: record.escalated ? '#ef4444' : '#f59e0b', fontWeight: 500 }}>
+                      {record.escalated ? `已升级 L${record.level}` : `已催办 L${record.level}`}
                     </Text>
                   </View>
                 ))}
@@ -158,6 +208,9 @@ const ApprovalPage: React.FC = () => {
           ))
         ) : (
           <View className={styles.emptyState}>
+            <View className={styles.emptyIcon}>
+              <Text className={styles.emptyIconText}>📋</Text>
+            </View>
             <Text className={styles.emptyText}>
               {activeTab === 'pending' ? '暂无待审批事项' : '暂无已审批记录'}
             </Text>

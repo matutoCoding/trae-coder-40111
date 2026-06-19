@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, Picker } from '@tarojs/components';
 import Taro, { useRouter } from '@tarojs/taro';
 import StatusTag from '@/components/StatusTag';
@@ -78,6 +78,10 @@ const BookingDetailPage: React.FC = () => {
   
   const canCancel = booking && (booking.status === 'pending' || booking.status === 'approved' || booking.status === 'in_use');
   
+  useEffect(() => {
+    checkAndHandleOvertime();
+  }, [checkAndHandleOvertime]);
+  
   const feedIconMap: Record<string, string> = {
     feeding: '🍽️',
     cleaning: '🧹',
@@ -95,8 +99,6 @@ const BookingDetailPage: React.FC = () => {
       </View>
     );
   }
-  
-  checkAndHandleOvertime();
   
   return (
     <View className={styles.page}>

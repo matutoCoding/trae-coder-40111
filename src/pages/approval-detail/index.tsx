@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { View, Text } from '@tarojs/components';
 import Taro, { useRouter } from '@tarojs/taro';
 import StatusTag from '@/components/StatusTag';
@@ -20,23 +20,26 @@ const ApprovalDetailPage: React.FC = () => {
   const bookings = useAppStore(s => s.bookings);
   const approveNode = useAppStore(s => s.approveNode);
   const rejectNode = useAppStore(s => s.rejectNode);
+  const checkAndHandleOvertime = useAppStore(s => s.checkAndHandleOvertime);
   
-  const approvalItem = useMemo(() => {
-    const pending = pendingApprovals.find(item => item.node.id === nodeId);
-    if (pending) return pending;
-    const approved = approvedList.find(item => item.node.id === nodeId);
-    if (approved) return approved;
-    return null;
-  }, [pendingApprovals, approvedList, nodeId]);
+  useEffect(() => {
+    checkAndHandleOvertime();
+  }, [checkAndHandleOvertime]);
   
   const booking = useMemo(() => {
-    if (approvalItem) return approvalItem.booking;
     return bookings.find(b => b.id === bookingId) || null;
-  }, [approvalItem, bookings, bookingId]);
+  }, [bookings, bookingId]);
   
   const node = useMemo(() => {
-    return approvalItem?.node || null;
-  }, [approvalItem]);
+    if (booking) {
+      return booking.approvalNodes.find(n => n.id === nodeId) || null;
+    }
+    const pending = pendingApprovals.find(item => item.node.id === nodeId);
+    if (pending) return pending.node;
+    const approved = approvedList.find(item => item.node.id === nodeId);
+    if (approved) return approved.node;
+    return null;
+  }, [booking, pendingApprovals, approvedList, nodeId]);
   
   const trails = useMemo(() => {
     const bid = booking?.id || bookingId;
@@ -44,8 +47,16 @@ const ApprovalDetailPage: React.FC = () => {
   }, [approvalTrails, booking, bookingId]);
   
   const nodeOvertimeRecords = useMemo(() => {
-    return overtimeRecords.filter(r => r.nodeId === nodeId || r.bookingId === (booking?.id || bookingId));
-  }, [overtimeRecords, nodeId, booking, bookingId]);
+    const seen = new Set<number>();
+    const result: typeof overtimeRecords = [];
+    overtimeRecords.forEach(r => {
+      if (r.nodeId !== nodeId) return;
+      if (seen.has(r.level)) return;
+      seen.add(r.level);
+      result.push(r);
+    });
+    return result.sort((a, b) => a.level - b.level);
+  }, [overtimeRecords, nodeId]);
   
   const isPending = node && (node.status === 'pending' || node.status === 'overtime');
   
