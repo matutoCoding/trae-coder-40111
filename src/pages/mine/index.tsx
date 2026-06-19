@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import { currentUser } from '@/data/user';
-import { myBookings } from '@/data/booking';
+import { useAppStore } from '@/store';
 import styles from './index.module.scss';
 
 const roleLabels: Record<string, string> = {
@@ -32,11 +32,13 @@ const menuGroups = [
 ];
 
 const MinePage: React.FC = () => {
-  const stats = {
-    bookings: myBookings.length,
-    pending: myBookings.filter(b => b.status === 'pending').length,
-    completed: myBookings.filter(b => b.status === 'completed').length
-  };
+  const bookings = useAppStore(s => s.bookings);
+  
+  const stats = useMemo(() => ({
+    bookings: bookings.length,
+    pending: bookings.filter(b => b.status === 'pending').length,
+    completed: bookings.filter(b => b.status === 'completed' || b.status === 'approved').length
+  }), [bookings]);
   
   const handleMenuClick = (item: { path: string; id: string }) => {
     console.log('[MinePage] 点击菜单项', item.id);

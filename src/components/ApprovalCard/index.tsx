@@ -11,9 +11,11 @@ interface ApprovalCardProps {
   approval: ApprovalNode & { booking: Booking };
   onClick?: () => void;
   showActions?: boolean;
+  onApprove?: (id: string) => void;
+  onReject?: (id: string) => void;
 }
 
-const ApprovalCard: React.FC<ApprovalCardProps> = ({ approval, onClick, showActions = true }) => {
+const ApprovalCard: React.FC<ApprovalCardProps> = ({ approval, onClick, showActions = true, onApprove, onReject }) => {
   const { booking, nodeName, approverName, deadline, isOvertime: overtime, escalated } = approval;
   
   const handleClick = () => {
@@ -21,21 +23,23 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({ approval, onClick, showActi
       onClick();
     } else {
       Taro.navigateTo({
-        url: `/pages/approval-detail/index?id=${approval.id}`
+        url: `/pages/approval-detail/index?id=${approval.id}&bookingId=${approval.bookingId}`
       });
     }
   };
   
   const handleApprove = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('[ApprovalCard] 审批通过', approval.id);
-    Taro.showToast({ title: '已通过', icon: 'success' });
+    if (onApprove) {
+      onApprove(approval.id);
+    }
   };
   
   const handleReject = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('[ApprovalCard] 审批拒绝', approval.id);
-    Taro.showToast({ title: '已拒绝', icon: 'none' });
+    if (onReject) {
+      onReject(approval.id);
+    }
   };
   
   const overtimeFlag = overtime || isOvertime(deadline);
@@ -95,7 +99,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({ approval, onClick, showActi
         </Text>
       </View>
       
-      {showActions && approval.status === 'pending' && (
+      {showActions && (approval.status === 'pending' || approval.status === 'overtime') && (
         <View className={styles.actions}>
           <View className={`${styles.actionBtn} ${styles.rejectBtn}`} onClick={handleReject}>
             <Text className={styles.rejectText}>拒绝</Text>

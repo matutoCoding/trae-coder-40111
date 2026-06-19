@@ -3,33 +3,295 @@
 .page {
   min-height: 100vh;
   background-color: $color-bg-page;
+  padding-bottom: 180rpx;
+}
+
+.header {
+  padding: $spacing-lg $page-padding;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+}
+
+.headerTitle {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: $color-text-white;
+  display: block;
+  margin-bottom: $spacing-xs;
+}
+
+.headerSub {
+  font-size: $font-size-sm;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.content {
+  padding: 0 $page-padding;
+  margin-top: -$spacing-lg;
+}
+
+.section {
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-md;
+}
+
+.sectionHeader {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+  padding-bottom: $spacing-md;
+  border-bottom: 1rpx solid $color-divider;
 }
 
-.container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: $spacing-xl * 2;
-}
-
-.icon {
-  font-size: 120rpx;
-  margin-bottom: $spacing-lg;
-}
-
-.title {
-  font-size: $font-size-lg;
+.sectionTitle {
+  font-size: $font-size-md;
   font-weight: $font-weight-semibold;
   color: $color-text-primary;
-  margin-bottom: $spacing-sm;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
 }
 
-.desc {
-  font-size: $font-size-md;
+.titleBar {
+  width: 6rpx;
+  height: 28rpx;
+  background: linear-gradient(180deg, $color-primary 0%, $color-primary-light 100%);
+  border-radius: 3rpx;
+}
+
+.infoGrid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.infoItem {
+  width: 50%;
+  margin-bottom: $spacing-md;
+  
+  &:nth-last-child(-n+2) {
+    margin-bottom: 0;
+  }
+}
+
+.infoLabel {
+  font-size: $font-size-sm;
   color: $color-text-tertiary;
+  margin-bottom: 4rpx;
+  display: block;
+}
+
+.infoValue {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.infoFull {
+  width: 100%;
+  margin-bottom: $spacing-md;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.nodeList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.nodeItem {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-md;
+  border-radius: $radius-md;
+  background-color: $color-bg-hover;
+}
+
+.nodeStep {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: $radius-round;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-bold;
+  flex-shrink: 0;
+}
+
+.nodePending {
+  background-color: $color-warning-bg;
+  color: $color-warning;
+}
+
+.nodeApproved {
+  background-color: $color-secondary-bg;
+  color: $color-secondary;
+}
+
+.nodeRejected {
+  background-color: $color-error-bg;
+  color: $color-error;
+}
+
+.nodeDefault {
+  background-color: $color-bg-hover;
+  color: $color-text-tertiary;
+}
+
+.nodeContent {
+  flex: 1;
+}
+
+.nodeName {
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.nodeApprover {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.nodeComment {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  display: block;
+}
+
+.nodeTime {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  display: block;
+  margin-top: 4rpx;
+}
+
+.overtimeSection {
+  background-color: rgba(239, 68, 68, 0.05);
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-md;
+  border: 2rpx solid rgba(239, 68, 68, 0.2);
+}
+
+.overtimeTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-error;
+  margin-bottom: $spacing-md;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.overtimeItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-sm 0;
+  border-bottom: 1rpx solid $color-divider;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.overtimeLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.overtimeValue {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.overtimeLevel {
+  font-size: $font-size-xs;
+  padding: 4rpx 16rpx;
+  border-radius: $radius-round;
+  
+  &.level1 {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: $color-warning;
+  }
+  
+  &.level2 {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: $color-error;
+  }
+  
+  &.level3 {
+    background-color: rgba(220, 38, 38, 0.2);
+    color: #dc2626;
+  }
+}
+
+.bottomBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: $spacing-md $page-padding;
+  padding-bottom: calc(#{$spacing-md} + env(safe-area-inset-bottom));
+  background-color: $color-bg-card;
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: $spacing-md;
+}
+
+.actionBtn {
+  flex: 1;
+  height: $button-height-lg;
+  border-radius: $radius-button;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+}
+
+.rejectBtn {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.rejectText {
+  font-size: $font-size-md;
+  color: $color-error;
+  font-weight: $font-weight-semibold;
+}
+
+.approveBtn {
+  background: linear-gradient(135deg, $color-secondary 0%, $color-secondary-light 100%);
+}
+
+.approveText {
+  font-size: $font-size-md;
+  color: $color-text-white;
+  font-weight: $font-weight-semibold;
+}
+
+.trailEmpty {
   text-align: center;
+  padding: $spacing-lg 0;
+}
+
+.trailEmptyText {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
 }

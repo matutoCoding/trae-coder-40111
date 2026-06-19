@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import BookingCard from '@/components/BookingCard';
-import { myBookings } from '@/data/booking';
+import { useAppStore } from '@/store';
 
 import styles from './index.module.scss';
 
@@ -18,10 +18,22 @@ const BookingPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('all');
   const [refreshing, setRefreshing] = useState(false);
   
+  const bookings = useAppStore(s => s.bookings);
+  
   const filteredBookings = useMemo(() => {
-    if (activeTab === 'all') return myBookings;
-    return myBookings.filter(b => b.status === activeTab);
-  }, [activeTab]);
+    if (activeTab === 'all') return bookings;
+    return bookings.filter(b => b.status === activeTab);
+  }, [bookings, activeTab]);
+  
+  const tabCounts = useMemo(() => {
+    return {
+      all: bookings.length,
+      pending: bookings.filter(b => b.status === 'pending').length,
+      approved: bookings.filter(b => b.status === 'approved').length,
+      in_use: bookings.filter(b => b.status === 'in_use').length,
+      completed: bookings.filter(b => b.status === 'completed').length
+    };
+  }, [bookings]);
   
   const handleRefresh = () => {
     console.log('[BookingPage] 下拉刷新');
@@ -34,12 +46,6 @@ const BookingPage: React.FC = () => {
   
   const handleTabChange = (key: string) => {
     setActiveTab(key);
-  };
-  
-  const handleCreateBooking = () => {
-    Taro.navigateTo({
-      url: '/pages/create-booking/index'
-    });
   };
   
   return (

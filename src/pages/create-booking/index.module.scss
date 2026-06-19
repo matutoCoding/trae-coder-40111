@@ -3,33 +3,261 @@
 .page {
   min-height: 100vh;
   background-color: $color-bg-page;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding-bottom: 160rpx;
 }
 
-.container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: $spacing-xl * 2;
+.section {
+  margin: $spacing-md $page-padding;
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
 }
 
-.icon {
-  font-size: 120rpx;
-  margin-bottom: $spacing-lg;
-}
-
-.title {
-  font-size: $font-size-lg;
+.sectionTitle {
+  font-size: $font-size-md;
   font-weight: $font-weight-semibold;
   color: $color-text-primary;
-  margin-bottom: $spacing-sm;
+  margin-bottom: $spacing-md;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
 }
 
-.desc {
-  font-size: $font-size-md;
+.required {
+  color: $color-error;
+  font-size: $font-size-lg;
+}
+
+.cageList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.cageOption {
+  padding: 16rpx 24rpx;
+  border-radius: $radius-md;
+  background-color: $color-bg-hover;
+  border: 2rpx solid transparent;
+  transition: all $transition-base;
+  
+  &.selected {
+    border-color: $color-primary;
+    background-color: $color-primary-bg;
+  }
+}
+
+.cageCode {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $color-text-secondary;
+  
+  .selected & {
+    color: $color-primary;
+  }
+}
+
+.cageStatus {
+  font-size: $font-size-xs;
   color: $color-text-tertiary;
+  margin-top: 4rpx;
+  
+  .selected & {
+    color: $color-primary;
+  }
+}
+
+.dateRow {
+  display: flex;
+  gap: $spacing-md;
+  margin-bottom: $spacing-md;
+}
+
+.dateField {
+  flex: 1;
+}
+
+.dateLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-bottom: $spacing-xs;
+  display: block;
+}
+
+.dateInput {
+  height: 80rpx;
+  background-color: $color-bg-hover;
+  border-radius: $radius-md;
+  padding: 0 $spacing-md;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  border: 2rpx solid transparent;
+  
+  &:focus {
+    border-color: $color-primary;
+  }
+}
+
+.inputGroup {
+  margin-bottom: $spacing-md;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.inputLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-bottom: $spacing-xs;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.input {
+  height: 80rpx;
+  background-color: $color-bg-hover;
+  border-radius: $radius-md;
+  padding: 0 $spacing-md;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  border: 2rpx solid transparent;
+  width: 100%;
+  box-sizing: border-box;
+  
+  &:focus {
+    border-color: $color-primary;
+  }
+}
+
+.textarea {
+  min-height: 160rpx;
+  background-color: $color-bg-hover;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  border: 2rpx solid transparent;
+  width: 100%;
+  box-sizing: border-box;
+  
+  &:focus {
+    border-color: $color-primary;
+  }
+}
+
+.typeList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.typeOption {
+  padding: 12rpx 24rpx;
+  border-radius: $radius-button;
+  background-color: $color-bg-hover;
+  border: 2rpx solid transparent;
+  
+  &.selected {
+    border-color: $color-primary;
+    background-color: $color-primary-bg;
+  }
+}
+
+.typeText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  white-space: nowrap;
+  
+  .selected & {
+    color: $color-primary;
+    font-weight: $font-weight-medium;
+  }
+}
+
+.summaryCard {
+  margin: $spacing-md $page-padding;
+  background: linear-gradient(135deg, $color-primary-bg 0%, rgba(14, 165, 233, 0.05) 100%);
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  border: 2rpx solid rgba(14, 165, 233, 0.2);
+}
+
+.summaryTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-primary;
+  margin-bottom: $spacing-md;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: $spacing-xs;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.summaryLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.summaryValue {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.bottomBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: $spacing-md $page-padding;
+  padding-bottom: calc(#{$spacing-md} + env(safe-area-inset-bottom));
+  background-color: $color-bg-card;
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: $spacing-md;
+}
+
+.submitBtn {
+  flex: 1;
+  height: $button-height-lg;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  border-radius: $radius-button;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-base;
+  
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+  
+  &.disabled {
+    opacity: 0.5;
+  }
+}
+
+.submitText {
+  font-size: $font-size-md;
+  color: $color-text-white;
+  font-weight: $font-weight-semibold;
+}
+
+.emptyCage {
+  padding: $spacing-lg 0;
   text-align: center;
+}
+
+.emptyCageText {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
 }
