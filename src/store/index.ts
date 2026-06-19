@@ -1,20 +1,33 @@
 import { create } from 'zustand';
 import type { Booking, FeedingRecord } from '@/types/booking';
 import type { ApprovalNode, ApprovalTrail, OvertimeRecord } from '@/types/approval';
+import type { Cage } from '@/types/cage';
 import { myBookings as initBookings, feedingRecords as initFeeding } from '@/data/booking';
 import { pendingApprovals as initPending, myApproved as initApproved, overtimeRecords as initOvertime } from '@/data/approval';
+import { cageList as initCages } from '@/data/cage';
 import { currentUser } from '@/data/user';
+import { canMerge, mergeBookings } from '@/utils/booking-merge';
 
 interface ApprovalItem {
   node: ApprovalNode;
   booking: Booking;
 }
 
+interface OvertimeStatus {
+  handled: boolean;
+  handledAt?: string;
+  handledBy?: string;
+  handledByName?: string;
+  handlingComment?: string;
+}
+
 interface AppState {
   bookings: Booking[];
+  cages: Cage[];
   pendingApprovals: ApprovalItem[];
   approvedList: ApprovalItem[];
   overtimeRecords: OvertimeRecord[];
+  overtimeStatus: Record<string, OvertimeStatus>;
   feedingRecords: FeedingRecord[];
   approvalTrails: Record<string, ApprovalTrail[]>;
   _overtimeHandled: Set<string>;
@@ -24,16 +37,33 @@ interface AppState {
   approveNode: (nodeId: string, comment: string) => void;
   rejectNode: (nodeId: string, comment: string) => void;
   addOvertimeRecord: (record: OvertimeRecord) => void;
+  resolveOvertimeRecord: (recordId: string, comment: string) => void;
   addApprovalTrail: (bookingId: string, trail: ApprovalTrail) => void;
   addFeedingRecord: (record: FeedingRecord) => void;
   checkAndHandleOvertime: () => void;
+  syncCageState: () => void;
+  getCageOccupancy: (cageId: string) => Array<{
+    startTime: string;
+    endTime: string;
+    groupId: string;
+    groupName: string;
+    bookingId: string;
+    bookingStatus: string;
+  }>;
+  checkConflict: (cageId: string, startTime: string, endTime: string, excludeBookingId?: string) => boolean;
 }
 
 const generateId = () => `id-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-const buildApprovalNodes = (bookingId: string): ApprovalNode[] => {
+const nodeTypeMap: Record<string, { idx: number; approverId: string; approverName: string; nodeName: string }> = {
+  group_leader: { idx: 0, approverId: 'approver001', approverName: '李教授', nodeName: '课题组负责人审批' },
+  lab_manager: { idx: 1, approverId: 'approver002', approverName: '赵主任', nodeName: '实验室管理员审批' },
+  animal_center: { idx: 2, approverId: 'approver003', approverName: '孙主任', nodeName: '动物中心审批' }
+};
+
+const buildApprovalNodes = (bookingId: string, status: Record<number, ApprovalNode['status']> = {}, startIdx = 0): ApprovalNode[] => {
   const now = new Date();
-  return [
+  const nodes: ApprovalNode[] = [
     {
       id: `${bookingId}-node-1`,
       bookingId,
@@ -77,6 +107,15 @@ const buildApprovalNodes = (bookingId: string): ApprovalNode[] => {
       escalated: false
     }
   ];
+  
+  Object.keys(status).forEach(k => {
+    const idx = parseInt(k);
+    if (nodes[idx]) {
+      nodes[idx].status = status[idx];
+    }
+  });
+  
+  return nodes;
 };
 
 const initTrails: Record<string, ApprovalTrail[]> = {};
@@ -87,17 +126,60 @@ initBookingIds.forEach(id => {
     initTrails[id] = booking.approvalTrails;
   }
 });
-initPending.forEach(item => {
-  if (item.booking.approvalTrails && item.booking.approvalTrails.length > 0) {
-    initTrails[item.booking.id] = item.booking.approvalTrails;
-  }
-});
 
 const initOvertimeHandled = new Set<string>();
 initOvertime.forEach(record => {
   const key = `${record.nodeId}-l${record.level}`;
   initOvertimeHandled.add(key);
 });
+
+const normalizePendingBookings = (bookings: Booking[], pendingList: ApprovalItem[]): { bookings: Booking[]; pending: ApprovalItem[] } => {
+  const bookingMap = new Map<string, Booking>();
+  bookings.forEach(b => bookingMap.set(b.id, b));
+  
+  const newPending: ApprovalItem[] = [];
+  
+  pendingList.forEach(item => {
+    const bookingId = item.booking.id;
+    const existing = bookingMap.get(bookingId);
+    const existingNodes = existing?.approvalNodes || [];
+    
+    let nodes: ApprovalNode[] = existingNodes;
+    if (!nodes || nodes.length === 0) {
+      const nodeIdx = nodeTypeMap[item.node.nodeType]?.idx || 0;
+      const statusMap: Record<number, ApprovalNode['status']> = {};
+      for (let i = 0; i < nodeIdx; i++) {
+        statusMap[i] = 'approved';
+      }
+      statusMap[nodeIdx] = item.node.status;
+      nodes = buildApprovalNodes(bookingId, statusMap, nodeIdx);
+      
+      nodes[nodeIdx] = {
+        ...nodes[nodeIdx],
+        ...item.node,
+        id: item.node.id
+      };
+    }
+    
+    const updatedBooking: Booking = {
+      ...item.booking,
+      ...(existing || {}),
+      approvalNodes: nodes,
+      currentApprovalNode: (nodeTypeMap[item.node.nodeType]?.idx || 0) + 1
+    };
+    
+    bookingMap.set(bookingId, updatedBooking);
+    newPending.push({
+      node: nodes[nodeTypeMap[item.node.nodeType]?.idx || 0],
+      booking: updatedBooking
+    });
+  });
+  
+  return {
+    bookings: Array.from(bookingMap.values()),
+    pending: newPending
+  };
+};
 
 const syncBookingInApprovals = (bookings: Booking[], pending: ApprovalItem[], approved: ApprovalItem[]): { pending: ApprovalItem[]; approved: ApprovalItem[] } => {
   const newPending = pending.map(item => {
@@ -127,11 +209,65 @@ const syncBookingInApprovals = (bookings: Booking[], pending: ApprovalItem[], ap
   return { pending: newPending, approved: newApproved };
 };
 
+const computeCageState = (cages: Cage[], bookings: Booking[]): Cage[] => {
+  const now = new Date().getTime();
+  
+  return cages.map(cage => {
+    const activeBookings = bookings.filter(b =>
+      b.cageId === cage.id &&
+      (b.status === 'approved' || b.status === 'in_use')
+    );
+    
+    let occupiedNow = false;
+    let totalAnimalsNow = 0;
+    let hasFutureReserved = false;
+    
+    activeBookings.forEach(b => {
+      const start = new Date(b.startTime).getTime();
+      const end = new Date(b.endTime).getTime();
+      
+      if (now >= start && now <= end) {
+        occupiedNow = true;
+        totalAnimalsNow += b.animalCount;
+      }
+      if (now < start) {
+        hasFutureReserved = true;
+      }
+    });
+    
+    const effectiveAnimals = Math.min(totalAnimalsNow, cage.capacity);
+    let status: Cage['status'] = cage.status;
+    if (cage.status === 'maintenance') {
+      status = 'maintenance';
+    } else if (occupiedNow) {
+      status = 'occupied';
+    } else if (hasFutureReserved) {
+      status = 'reserved';
+    } else {
+      status = 'available';
+    }
+    
+    return {
+      ...cage,
+      currentAnimals: effectiveAnimals,
+      status
+    };
+  });
+};
+
+const initData = normalizePendingBookings(
+  [...initBookings],
+  initPending.map(item => ({ node: item, booking: item.booking }))
+);
+const initCagesNormalized = computeCageState(initCages, initData.bookings);
+
 export const useAppStore = create<AppState>((set, get) => ({
-  bookings: initBookings,
-  pendingApprovals: initPending.map(item => ({ node: item, booking: item.booking })),
+  bookings: initData.bookings,
+  cages: initCagesNormalized,
+  pendingApprovals: initData.pending,
   approvedList: initApproved.map(item => ({ node: item, booking: item.booking })),
   overtimeRecords: initOvertime,
+  overtimeStatus: {},
   feedingRecords: initFeeding,
   approvalTrails: initTrails,
   _overtimeHandled: initOvertimeHandled,
@@ -227,10 +363,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           finalBookings = [...finalBookings, secondBooking];
           newTrails[`${booking.id}-part2`] = [cancelTrail];
 
+          const newCages = computeCageState(state.cages, finalBookings);
           const { pending, approved } = syncBookingInApprovals(finalBookings, state.pendingApprovals, state.approvedList);
 
           return {
             bookings: finalBookings,
+            cages: newCages,
             pendingApprovals: pending.filter(item => item.booking.id !== bookingId && item.booking.id !== `${booking.id}-part2`),
             approvedList: approved,
             approvalTrails: newTrails
@@ -245,10 +383,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         return b;
       });
 
+      const newCages = computeCageState(state.cages, finalBookings);
       const { pending, approved } = syncBookingInApprovals(finalBookings, state.pendingApprovals, state.approvedList);
 
       return {
         bookings: finalBookings,
+        cages: newCages,
         pendingApprovals: pending.filter(item => item.booking.id !== bookingId),
         approvedList: approved,
         approvalTrails: newTrails
@@ -336,8 +476,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       const newApproved = [{ node: approvedNode, booking: updatedBooking }, ...state.approvedList];
-
       const existingTrails = state.approvalTrails[bookingId] || [];
+      const newCages = computeCageState(state.cages, updatedBookings);
+
+      const relatedNodeIds = state.bookings.find(b => b.id === bookingId)?.approvalNodes.map(n => n.id) || [];
+      const newOvertimeStatus = { ...state.overtimeStatus };
+      relatedNodeIds.forEach(nid => {
+        state.overtimeRecords.forEach(or => {
+          if (or.nodeId === nid) {
+            newOvertimeStatus[or.id] = {
+              handled: true,
+              handledAt: now.toISOString(),
+              handledBy: currentUser.id,
+              handledByName: currentUser.name,
+              handlingComment: comment
+            };
+          }
+        });
+      });
 
       const { pending: syncedPending, approved: syncedApproved } = syncBookingInApprovals(
         updatedBookings,
@@ -347,8 +503,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return {
         bookings: updatedBookings,
+        cages: newCages,
         pendingApprovals: syncedPending,
         approvedList: syncedApproved,
+        overtimeStatus: newOvertimeStatus,
         approvalTrails: {
           ...state.approvalTrails,
           [bookingId]: [...existingTrails, trail]
@@ -406,8 +564,24 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const newPending = state.pendingApprovals.filter(item => item.booking.id !== bookingId);
       const newApproved = [{ node: rejectedNode, booking: updatedBooking }, ...state.approvedList];
-
       const existingTrails = state.approvalTrails[bookingId] || [];
+      const newCages = computeCageState(state.cages, updatedBookings);
+
+      const relatedNodeIds = booking.approvalNodes.map(n => n.id);
+      const newOvertimeStatus = { ...state.overtimeStatus };
+      relatedNodeIds.forEach(nid => {
+        state.overtimeRecords.forEach(or => {
+          if (or.nodeId === nid) {
+            newOvertimeStatus[or.id] = {
+              handled: true,
+              handledAt: now.toISOString(),
+              handledBy: currentUser.id,
+              handledByName: currentUser.name,
+              handlingComment: comment
+            };
+          }
+        });
+      });
 
       const { pending: syncedPending, approved: syncedApproved } = syncBookingInApprovals(
         updatedBookings,
@@ -417,8 +591,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return {
         bookings: updatedBookings,
+        cages: newCages,
         pendingApprovals: syncedPending,
         approvedList: syncedApproved,
+        overtimeStatus: newOvertimeStatus,
         approvalTrails: {
           ...state.approvalTrails,
           [bookingId]: [...existingTrails, trail]
@@ -431,6 +607,44 @@ export const useAppStore = create<AppState>((set, get) => ({
     set(state => ({
       overtimeRecords: [record, ...state.overtimeRecords]
     }));
+  },
+
+  resolveOvertimeRecord: (recordId, comment) => {
+    set(state => {
+      const now = new Date();
+      const record = state.overtimeRecords.find(r => r.id === recordId);
+      if (!record) return state;
+      
+      const trail: ApprovalTrail = {
+        id: generateId(),
+        nodeId: record.nodeId,
+        action: 'remind',
+        operatorId: currentUser.id,
+        operatorName: currentUser.name,
+        operatorRole: '审批人',
+        comment: `超时处理：${comment || '已处理并继续审批'}`,
+        timestamp: now.toISOString()
+      };
+      
+      const existingTrails = state.approvalTrails[record.bookingId] || [];
+      
+      return {
+        overtimeStatus: {
+          ...state.overtimeStatus,
+          [recordId]: {
+            handled: true,
+            handledAt: now.toISOString(),
+            handledBy: currentUser.id,
+            handledByName: currentUser.name,
+            handlingComment: comment
+          }
+        },
+        approvalTrails: {
+          ...state.approvalTrails,
+          [record.bookingId]: [...existingTrails, trail]
+        }
+      };
+    });
   },
 
   addApprovalTrail: (bookingId, trail) => {
@@ -588,5 +802,82 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
       });
     }
+  },
+
+  syncCageState: () => {
+    set(state => ({
+      cages: computeCageState(state.cages, state.bookings)
+    }));
+  },
+
+  getCageOccupancy: (cageId) => {
+    const state = get();
+    const occupancy: Array<{
+      startTime: string;
+      endTime: string;
+      groupId: string;
+      groupName: string;
+      bookingId: string;
+      bookingStatus: string;
+    }> = [];
+
+    const relevantBookings = state.bookings
+      .filter(b => b.cageId === cageId && (b.status === 'approved' || b.status === 'in_use' || b.status === 'pending' || b.status === 'completed'))
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+    const groupMap = new Map<string, typeof occupancy>();
+    relevantBookings.forEach(b => {
+      const key = b.groupId;
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key)!.push({
+        startTime: b.startTime,
+        endTime: b.endTime,
+        groupId: b.groupId,
+        groupName: b.groupName,
+        bookingId: b.id,
+        bookingStatus: b.status
+      });
+    });
+
+    groupMap.forEach(items => {
+      let i = 0;
+      while (i < items.length) {
+        let current = { ...items[i] };
+        let j = i + 1;
+        while (j < items.length) {
+          const endCurrent = new Date(current.endTime).getTime();
+          const startNext = new Date(items[j].startTime).getTime();
+          if (current.groupId === items[j].groupId && (startNext - endCurrent) <= 3600000) {
+            current.endTime = items[j].endTime;
+            j++;
+          } else {
+            break;
+          }
+        }
+        occupancy.push(current);
+        i = j;
+      }
+    });
+
+    return occupancy.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  },
+
+  checkConflict: (cageId, startTime, endTime, excludeBookingId) => {
+    const state = get();
+    const startMs = new Date(startTime).getTime();
+    const endMs = new Date(endTime).getTime();
+    
+    if (endMs <= startMs) return true;
+    
+    return state.bookings.some(b => {
+      if (excludeBookingId && b.id === excludeBookingId) return false;
+      if (b.cageId !== cageId) return false;
+      if (b.status === 'cancelled' || b.status === 'rejected') return false;
+      
+      const bStart = new Date(b.startTime).getTime();
+      const bEnd = new Date(b.endTime).getTime();
+      
+      return startMs < bEnd && endMs > bStart;
+    });
   }
 }));

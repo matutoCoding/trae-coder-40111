@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, Input, Picker } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import Taro, { useRouter } from '@tarojs/taro';
 import { useAppStore } from '@/store';
 import { cageList } from '@/data/cage';
 import { currentUser } from '@/data/user';
+import { formatDate } from '@/utils/date';
 import dayjs from 'dayjs';
 import styles from './index.module.scss';
 
@@ -13,9 +14,14 @@ const animalTypes = [
 ];
 
 const CreateBookingPage: React.FC = () => {
+  const router = useRouter();
+  const paramCageId = router.params.cageId || '';
   const addBooking = useAppStore(s => s.addBooking);
+  const getCageOccupancy = useAppStore(s => s.getCageOccupancy);
+  const checkConflict = useAppStore(s => s.checkConflict);
+  const bookings = useAppStore(s => s.bookings);
   
-  const [selectedCageId, setSelectedCageId] = useState('');
+  const [selectedCageId, setSelectedCageId] = useState(paramCageId);
   const [startDate, setStartDate] = useState(dayjs().add(1, 'day').format('YYYY-MM-DD'));
   const [endDate, setEndDate] = useState(dayjs().add(3, 'day').format('YYYY-MM-DD'));
   const [startTime, setStartTime] = useState('08:00');
@@ -27,12 +33,37 @@ const CreateBookingPage: React.FC = () => {
   const [animalTypeIdx, setAnimalTypeIdx] = useState(0);
   
   const availableCages = useMemo(() => {
-    return cageList.filter(c => c.status === 'available' || c.status === 'occupied');
+    return cageList.filter(c => c.status === 'available' || c.status === 'occupied' || c.status === 'reserved');
   }, []);
   
   const selectedCage = useMemo(() => {
     return cageList.find(c => c.id === selectedCageId);
   }, [selectedCageId]);
+  
+  const startDateTimeStr = `${startDate} ${startTime}`;
+  const endDateTimeStr = `${endDate} ${endTime}`;
+  
+  const occupancy = useMemo(() => {
+    if (!selectedCageId) return [];
+    return getCageOccupancy(selectedCageId);
+  }, [selectedCageId, getCageOccupancy]);
+  
+  const hasConflict = useMemo(() => {
+    if (!selectedCageId || !startDate || !endDate || !startTime || !endTime) return false;
+    return checkConflict(selectedCageId, startDateTimeStr, endDateTimeStr);
+  }, [selectedCageId, startDateTimeStr, endDateTimeStr, checkConflict]);
+  
+  const conflictItems = useMemo(() => {
+    if (!hasConflict) return [];
+    const startTs = new Date(startDateTimeStr).getTime();
+    const endTs = new Date(endDateTimeStr).getTime();
+    
+    return occupancy.filter(occ => {
+      const bStart = new Date(occ.startTime).getTime();
+      const bEnd = new Date(occ.endTime).getTime();
+      return startTs < bEnd && endTs > bStart;
+    });
+  }, [occupancy, startDateTimeStr, endDateTimeStr, hasConflict]);
   
   const duration = useMemo(() => {
     if (!startDate || !endDate) return 0;
@@ -43,10 +74,14 @@ const CreateBookingPage: React.FC = () => {
   
   const canSubmit = useMemo(() => {
     return selectedCageId && startDate && endDate && duration > 0 &&
-      animalCount && parseInt(animalCount) > 0 && selectedAnimalType && purpose;
-  }, [selectedCageId, startDate, endDate, duration, animalCount, selectedAnimalType, purpose]);
+      animalCount && parseInt(animalCount) > 0 && selectedAnimalType && purpose && !hasConflict;
+  }, [selectedCageId, startDate, endDate, duration, animalCount, selectedAnimalType, purpose, hasConflict]);
   
   const handleSubmit = () => {
+    if (hasConflict) {
+      Taro.showToast({ title: '所选时段存在冲突，请调整', icon: 'none' });
+      return;
+    }
     if (!canSubmit || !selectedCage) {
       Taro.showToast({ title: '请填写完整信息', icon: 'none' });
       return;
@@ -68,8 +103,8 @@ const CreateBookingPage: React.FC = () => {
       groupName: currentUser.groupName,
       applicantId: currentUser.id,
       applicantName: currentUser.name,
-      startTime: `${startDate} ${startTime}`,
-      endTime: `${endDate} ${endTime}`,
+      startTime: startDateTimeStr,
+      endTime: endDateTimeStr,
       duration,
       animalCount: count,
       animalType: selectedAnimalType,
@@ -126,18 +161,24 @@ const CreateBookingPage: React.FC = () => {
           <Text>选择笼位</Text>
         </View>
         <View className={styles.cageList}>
-          {availableCages.length > 0 ? availableCages.map(cage => (
-            <View
-              key={cage.id}
-              className={`${styles.cageOption} ${selectedCageId === cage.id ? styles.selected : ''}`}
-              onClick={() => setSelectedCageId(cage.id)}
-            >
-              <Text className={styles.cageCode}>{cage.code}</Text>
-              <Text className={styles.cageStatus}>
-                {cage.status === 'available' ? '空闲' : '使用中'} · {cage.room}
-              </Text>
-            </View>
-          )) : (
+          {availableCages.length > 0 ? availableCages.map(cage => {
+            const cageOcc = selectedCageId === cage.id ? occupancy : getCageOccupancy(cage.id);
+            return (
+              <View
+                key={cage.id}
+                className={`${styles.cageOption} ${selectedCageId === cage.id ? styles.selected : ''}`}
+                onClick={() => setSelectedCageId(cage.id)}
+              >
+                <Text className={styles.cageCode}>{cage.code}</Text>
+                <Text className={styles.cageStatus}>
+                  {cage.status === 'available' ? '空闲' : cage.status === 'occupied' ? '使用中' : cage.status === 'reserved' ? '已预约' : cage.status === 'maintenance' ? '维护中' : '未知'} · {cage.room}
+                </Text>
+                {cageOcc.length > 0 && (
+                  <Text className={styles.cageConflictBadge}>已占用 {cageOcc.length} 段</Text>
+                )}
+              </View>
+            );
+          }) : (
             <View className={styles.emptyCage}>
               <Text className={styles.emptyCageText}>暂无可用笼位</Text>
             </View>
@@ -188,6 +229,53 @@ const CreateBookingPage: React.FC = () => {
         </View>
       </View>
       
+      {selectedCageId && occupancy.length > 0 && (
+        <View className={styles.occupySection}>
+          <View className={styles.sectionTitle}>
+            <Text>📅 笼位排期占用</Text>
+            <Text style={{ fontSize: '24rpx', color: '#94a3b8' }}>{occupancy.length}段</Text>
+          </View>
+          {occupancy.map((occ, idx) => {
+            const isMine = occ.groupId === currentUser.groupId;
+            return (
+              <View
+                key={`${occ.bookingId}-${idx}`}
+                className={`${styles.occupyItem} ${isMine ? styles.occupyItemMine : styles.occupyItemOther}`}
+              >
+                <View className={styles.occupyItemGroup}>
+                  <Text>{occ.groupName}</Text>
+                  <View className={`${styles.occupyItemBadge} ${isMine ? 'mineBadge' : 'otherBadge'}`}>
+                    <Text>{isMine ? '我的' : '其他组'}</Text>
+                  </View>
+                </View>
+                <Text className={styles.occupyItemTime}>
+                  {formatDate(occ.startTime)} ~ {formatDate(occ.endTime)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+      
+      {hasConflict && conflictItems.length > 0 && (
+        <View className={styles.conflictSection}>
+          <View className={styles.conflictTitle}>⚠️ 时间冲突</View>
+          <Text className={styles.conflictTip}>
+            所选时段与以下 {conflictItems.length} 段预约重叠，请调整时间：
+          </Text>
+          {conflictItems.map((item, idx) => (
+            <View key={`${item.bookingId}-${idx}`} className={styles.conflictItem}>
+              <Text className={styles.conflictItemGroup}>
+                {item.groupName}（{item.groupId === currentUser.groupId ? '本组' : '其他组'}）
+              </Text>
+              <Text className={styles.conflictItemTime}>
+                {formatDate(item.startTime)} ~ {formatDate(item.endTime)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+      
       <View className={styles.section}>
         <View className={styles.sectionTitle}>
           <Text className={styles.required}>*</Text>
@@ -201,10 +289,15 @@ const CreateBookingPage: React.FC = () => {
           <Input
             className={styles.input}
             type="number"
-            placeholder="请输入动物数量"
+            placeholder={`最多 ${selectedCage?.capacity || 0} 只`}
             value={animalCount}
             onInput={(e) => setAnimalCount(e.detail.value)}
           />
+          {selectedCage && (
+            <Text style={{ fontSize: '24rpx', color: '#94a3b8', marginTop: '8rpx', display: 'block' }}>
+              笼位容量: {selectedCage.capacity}只
+            </Text>
+          )}
         </View>
         <View className={styles.inputGroup}>
           <Text className={styles.inputLabel}>
@@ -243,12 +336,12 @@ const CreateBookingPage: React.FC = () => {
         </View>
       </View>
       
-      {selectedCage && canSubmit && (
+      {selectedCage && canSubmit && !hasConflict && (
         <View className={styles.summaryCard}>
           <Text className={styles.summaryTitle}>预约摘要</Text>
           <View className={styles.summaryRow}>
             <Text className={styles.summaryLabel}>笼位</Text>
-            <Text className={styles.summaryValue}>{selectedCage.code}</Text>
+            <Text className={styles.summaryValue}>{selectedCage.code} · {selectedCage.room}</Text>
           </View>
           <View className={styles.summaryRow}>
             <Text className={styles.summaryLabel}>时间</Text>
@@ -274,7 +367,9 @@ const CreateBookingPage: React.FC = () => {
           className={`${styles.submitBtn} ${!canSubmit ? styles.disabled : ''}`}
           onClick={handleSubmit}
         >
-          <Text className={styles.submitText}>提交预约申请</Text>
+          <Text className={styles.submitText}>
+            {hasConflict ? '存在时间冲突' : '提交预约申请'}
+          </Text>
         </View>
       </View>
     </View>

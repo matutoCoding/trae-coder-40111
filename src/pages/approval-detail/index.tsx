@@ -17,10 +17,12 @@ const ApprovalDetailPage: React.FC = () => {
   const approvedList = useAppStore(s => s.approvedList);
   const approvalTrails = useAppStore(s => s.approvalTrails);
   const overtimeRecords = useAppStore(s => s.overtimeRecords);
+  const overtimeStatus = useAppStore(s => s.overtimeStatus);
   const bookings = useAppStore(s => s.bookings);
   const approveNode = useAppStore(s => s.approveNode);
   const rejectNode = useAppStore(s => s.rejectNode);
   const checkAndHandleOvertime = useAppStore(s => s.checkAndHandleOvertime);
+  const resolveOvertimeRecord = useAppStore(s => s.resolveOvertimeRecord);
   
   useEffect(() => {
     checkAndHandleOvertime();
@@ -57,6 +59,34 @@ const ApprovalDetailPage: React.FC = () => {
     });
     return result.sort((a, b) => a.level - b.level);
   }, [overtimeRecords, nodeId]);
+  
+  const handleResolveOvertime = (recordId: string) => {
+    Taro.showModal({
+      title: '处理超时提醒',
+      content: '请填写处理结果，确认归档该超时提醒',
+      editable: true,
+      placeholderText: '处理结果说明（如：已联系审批人）',
+      success: (res) => {
+        if (res.confirm) {
+          resolveOvertimeRecord(recordId, res.content || '已处理，归档超时提醒');
+          Taro.showToast({ title: '已处理并归档', icon: 'success' });
+        }
+      }
+    });
+  };
+  
+  const handleRemindAgain = (record: any) => {
+    Taro.showModal({
+      title: '再次催办',
+      content: `确认再次向「${record.responsiblePersonName}」发送催办？`,
+      success: (res) => {
+        if (res.confirm) {
+          resolveOvertimeRecord(record.id, '再次发送催办通知');
+          Taro.showToast({ title: '已再次催办', icon: 'success' });
+        }
+      }
+    });
+  };
   
   const isPending = node && (node.status === 'pending' || node.status === 'overtime');
   
@@ -209,26 +239,59 @@ const ApprovalDetailPage: React.FC = () => {
         {nodeOvertimeRecords.length > 0 && (
           <View className={styles.overtimeSection}>
             <Text className={styles.overtimeTitle}>⚠️ 超时催办记录</Text>
-            {nodeOvertimeRecords.map(record => (
-              <View key={record.id} className={styles.overtimeItem}>
-                <View style={{ flex: 1 }}>
-                  <Text className={styles.overtimeLabel}>
-                    责任人: {record.responsiblePersonName}
-                  </Text>
-                  <Text className={styles.overtimeLabel}>
-                    超时时间: {formatDateTime(record.overtimeAt)}
-                  </Text>
+            {nodeOvertimeRecords.map(record => {
+              const status = overtimeStatus[record.id];
+              const isHandled = status?.handled;
+              return (
+                <View key={record.id} className={`${styles.overtimeItem} ${isHandled ? styles.overtimeHandled : ''}`}>
+                  <View style={{ flex: 1, width: '100%' }}>
+                    <Text className={styles.overtimeHandledTag}>
+                      {isHandled ? '✓ 已归档' : '待处理'}
+                    </Text>
+                    <View style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text className={styles.overtimeLabel}>
+                          责任人: {record.responsiblePersonName}
+                        </Text>
+                        <Text className={styles.overtimeLabel}>
+                          超时时间: {formatDateTime(record.overtimeAt)}
+                        </Text>
+                      </View>
+                      <View style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4rpx' }}>
+                        <Text className={`${styles.overtimeLevel} ${record.level === 1 ? styles.level1 : record.level === 2 ? styles.level2 : styles.level3}`}>
+                          {record.escalated ? `已升级 L${record.level}` : `已催办 L${record.level}`}
+                        </Text>
+                        <Text style={{ fontSize: '22rpx', color: '#94a3b8' }}>
+                          {record.reminded ? '已通知' : '待通知'}
+                        </Text>
+                      </View>
+                    </View>
+                    {isHandled && status && (
+                      <View className={styles.overtimeHandledInfo}>
+                        <Text className={styles.overtimeHandledLabel}>
+                          处理人: {status.handledByName} · 处理时间: {formatDateTime(status.handledAt)}
+                        </Text>
+                        {status.handlingComment && (
+                          <Text className={styles.overtimeHandledValue}>
+                            处理结果: {status.handlingComment}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                    {!isHandled && (
+                      <View className={styles.overtimeActions}>
+                        <View className={styles.overtimeActionBtn} onClick={() => handleRemindAgain(record)}>
+                          <Text>再次催办</Text>
+                        </View>
+                        <View className={`${styles.overtimeActionBtn} ${styles.overtimeResolveBtn}`} onClick={() => handleResolveOvertime(record.id)}>
+                          <Text>处理并归档</Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
                 </View>
-                <View style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4rpx' }}>
-                  <Text className={`${styles.overtimeLevel} ${record.level === 1 ? styles.level1 : record.level === 2 ? styles.level2 : styles.level3}`}>
-                    {record.escalated ? `已升级 L${record.level}` : `已催办 L${record.level}`}
-                  </Text>
-                  <Text style={{ fontSize: '22rpx', color: '#94a3b8' }}>
-                    {record.reminded ? '已通知' : '待通知'}
-                  </Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
         

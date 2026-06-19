@@ -3,33 +3,394 @@
 .page {
   min-height: 100vh;
   background-color: $color-bg-page;
+  padding-bottom: 180rpx;
+}
+
+.header {
+  padding: $spacing-lg $page-padding;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+}
+
+.codeRow {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-xs;
 }
 
-.container {
+.cageCode {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: $color-text-white;
+}
+
+.cageName {
+  font-size: $font-size-md;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: $spacing-md;
+  display: block;
+}
+
+.cageMeta {
   display: flex;
-  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.metaItem {
+  background-color: rgba(255, 255, 255, 0.15);
+  padding: 8rpx 20rpx;
+  border-radius: $radius-round;
+  
+  text {
+    font-size: $font-size-xs;
+    color: $color-text-white;
+  }
+}
+
+.content {
+  padding: 0 $page-padding;
+  margin-top: -$spacing-lg;
+}
+
+.section {
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-md;
+}
+
+.sectionHeader {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  padding: $spacing-xl * 2;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+  padding-bottom: $spacing-md;
+  border-bottom: 1rpx solid $color-divider;
 }
 
-.icon {
-  font-size: 120rpx;
-  margin-bottom: $spacing-lg;
-}
-
-.title {
-  font-size: $font-size-lg;
+.sectionTitle {
+  font-size: $font-size-md;
   font-weight: $font-weight-semibold;
   color: $color-text-primary;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.titleBar {
+  width: 6rpx;
+  height: 28rpx;
+  background: linear-gradient(180deg, $color-primary 0%, $color-primary-light 100%);
+  border-radius: 3rpx;
+}
+
+.infoGrid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.infoItem {
+  width: 50%;
+  margin-bottom: $spacing-md;
+  
+  &:nth-last-child(-n+2) {
+    margin-bottom: 0;
+  }
+}
+
+.infoLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-bottom: 4rpx;
+  display: block;
+}
+
+.infoValue {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.capacityBar {
+  height: 16rpx;
+  background-color: $color-bg-hover;
+  border-radius: $radius-round;
+  overflow: hidden;
+  margin-top: $spacing-xs;
+}
+
+.capacityFill {
+  height: 100%;
+  background: linear-gradient(90deg, $color-secondary 0%, lighten($color-secondary, 10%) 100%);
+  border-radius: $radius-round;
+  transition: width $transition-base;
+}
+
+.capacityLow {
+  background: linear-gradient(90deg, $color-secondary 0%, lighten($color-secondary, 10%) 100%);
+}
+
+.capacityMid {
+  background: linear-gradient(90deg, $color-warning 0%, lighten($color-warning, 10%) 100%);
+}
+
+.capacityHigh {
+  background: linear-gradient(90deg, $color-error 0%, lighten($color-error, 10%) 100%);
+}
+
+.capacityText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  display: block;
+  margin-top: $spacing-xs;
+}
+
+.calendarNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+}
+
+.navBtn {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: $radius-md;
+  background-color: $color-bg-hover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:active {
+    background-color: rgba(14, 165, 233, 0.1);
+  }
+}
+
+.navBtnText {
+  font-size: $font-size-lg;
+  color: $color-primary;
+  font-weight: $font-weight-bold;
+}
+
+.calendarTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.weekdayRow {
+  display: flex;
   margin-bottom: $spacing-sm;
 }
 
-.desc {
-  font-size: $font-size-md;
-  color: $color-text-tertiary;
+.weekday {
+  flex: 1;
   text-align: center;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  padding: $spacing-xs 0;
+}
+
+.dayRow {
+  display: flex;
+  margin-bottom: $spacing-xs;
+}
+
+.dayCell {
+  flex: 1;
+  min-height: 64rpx;
+  padding: 4rpx;
+  border-radius: $radius-sm;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 8rpx;
+}
+
+.dayEmpty {
+  opacity: 0.3;
+}
+
+.dayNumber {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  margin-bottom: 4rpx;
+}
+
+.dayToday {
+  .dayNumber {
+    width: 40rpx;
+    height: 40rpx;
+    line-height: 40rpx;
+    text-align: center;
+    background-color: $color-primary;
+    color: $color-text-white;
+    border-radius: $radius-round;
+    font-weight: $font-weight-bold;
+  }
+}
+
+.dayHasBooking {
+  background-color: rgba(16, 185, 129, 0.08);
+}
+
+.dayHasConflict {
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+.dayDots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4rpx;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.dayDot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: $radius-round;
+  flex-shrink: 0;
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+  padding-top: $spacing-md;
+  border-top: 1rpx solid $color-divider;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.legendDot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: $radius-round;
+}
+
+.legendText {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.bookingList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.bookingItem {
+  padding: $spacing-md;
+  border-radius: $radius-md;
+  border-left: 6rpx solid;
+  background-color: $color-bg-hover;
+}
+
+.bookingHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-xs;
+}
+
+.bookingGroup {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.bookingMergeBadge {
+  font-size: $font-size-xs;
+  color: $color-primary;
+  background-color: rgba(14, 165, 233, 0.1);
+  padding: 4rpx 12rpx;
+  border-radius: $radius-round;
+}
+
+.bookingTime {
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.bookingPurpose {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  display: block;
+}
+
+.bookingEmpty {
+  padding: $spacing-lg 0;
+  text-align: center;
+}
+
+.bookingEmptyText {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.equipmentList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.equipmentTag {
+  padding: 8rpx 20rpx;
+  background-color: $color-bg-hover;
+  border-radius: $radius-sm;
+  
+  text {
+    font-size: $font-size-xs;
+    color: $color-text-secondary;
+  }
+}
+
+.bottomBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: $spacing-md $page-padding;
+  padding-bottom: calc(#{$spacing-md} + env(safe-area-inset-bottom));
+  background-color: $color-bg-card;
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.08);
+}
+
+.bookBtn {
+  height: $button-height-lg;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  border-radius: $radius-button;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+}
+
+.bookBtnDisabled {
+  background: $color-bg-hover;
+  
+  text {
+    color: $color-text-tertiary !important;
+  }
+}
+
+.bookBtnText {
+  font-size: $font-size-md;
+  color: $color-text-white;
+  font-weight: $font-weight-semibold;
 }

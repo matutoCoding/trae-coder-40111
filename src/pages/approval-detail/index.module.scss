@@ -239,6 +239,78 @@
   }
 }
 
+.overtimeActions {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+  padding-top: $spacing-sm;
+  border-top: 1rpx dashed $color-divider;
+  flex-wrap: wrap;
+}
+
+.overtimeActionBtn {
+  padding: 8rpx 24rpx;
+  border-radius: $radius-sm;
+  background-color: rgba(14, 165, 233, 0.1);
+  
+  text {
+    font-size: $font-size-xs;
+    color: $color-primary;
+    font-weight: $font-weight-medium;
+  }
+  
+  &:active {
+    background-color: rgba(14, 165, 233, 0.2);
+  }
+}
+
+.overtimeResolveBtn {
+  background-color: rgba(16, 185, 129, 0.1);
+  
+  text {
+    color: $color-secondary;
+  }
+  
+  &:active {
+    background-color: rgba(16, 185, 129, 0.2);
+  }
+}
+
+.overtimeHandled {
+  opacity: 0.6;
+}
+
+.overtimeHandledTag {
+  font-size: $font-size-xs;
+  padding: 4rpx 16rpx;
+  border-radius: $radius-round;
+  background-color: rgba(16, 185, 129, 0.15);
+  color: $color-secondary;
+  margin-left: auto;
+  margin-bottom: $spacing-xs;
+  display: inline-block;
+}
+
+.overtimeHandledInfo {
+  padding: $spacing-sm;
+  background-color: rgba(16, 185, 129, 0.05);
+  border-radius: $radius-sm;
+  margin-top: $spacing-xs;
+}
+
+.overtimeHandledLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.overtimeHandledValue {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  display: block;
+}
+
 .bottomBar {
   position: fixed;
   bottom: 0;
