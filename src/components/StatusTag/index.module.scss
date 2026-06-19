@@ -1,0 +1,117 @@
+@use '@/styles/variables.scss' as *;
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rpx 16rpx;
+  border-radius: $radius-sm;
+  
+  .text {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    line-height: 1.4;
+  }
+  
+  &.md {
+    padding: 6rpx 20rpx;
+    border-radius: $radius-sm;
+    
+    .text {
+      font-size: $font-size-sm;
+    }
+  }
+  
+  &.sm {
+    padding: 2rpx 12rpx;
+    border-radius: $radius-xs;
+    
+    .text {
+      font-size: 20rpx;
+    }
+  }
+}
+
+.available {
+  background-color: $color-secondary-bg;
+  .text {
+    color: $color-status-available;
+  }
+}
+
+.occupied {
+  background-color: rgba(239, 68, 68, 0.1);
+  .text {
+    color: $color-status-occupied;
+  }
+}
+
+.maintenance {
+  background-color: rgba(148, 163, 184, 0.15);
+  .text {
+    color: $color-text-tertiary;
+  }
+}
+
+.reserved {
+  background-color: rgba(14, 165, 233, 0.1);
+  .text {
+    color: $color-primary;
+  }
+}
+
+.pending {
+  background-color: rgba(245, 158, 11, 0.1);
+  .text {
+    color: $color-status-pending;
+  }
+}
+
+.approved {
+  background-color: $color-secondary-bg;
+  .text {
+    color: $color-status-approved;
+  }
+}
+
+.rejected {
+  background-color: rgba(239, 68, 68, 0.1);
+  .text {
+    color: $color-status-rejected;
+  }
+}
+
+.cancelled {
+  background-color: rgba(148, 163, 184, 0.15);
+  .text {
+    color: $color-text-tertiary;
+  }
+}
+
+.inUse {
+  background-color: $color-primary-bg;
+  .text {
+    color: $color-primary;
+  }
+}
+
+.completed {
+  background-color: rgba(148, 163, 184, 0.15);
+  .text {
+    color: $color-text-secondary;
+  }
+}
+
+.overtime {
+  background-color: rgba(239, 68, 68, 0.1);
+  .text {
+    color: $color-status-overtime;
+  }
+}
+
+.escalated {
+  background-color: rgba(245, 158, 11, 0.15);
+  .text {
+    color: $color-warning;
+  }
+}

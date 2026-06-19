@@ -1,0 +1,197 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-md;
+  transition: all $transition-base;
+  
+  &:active {
+    transform: scale(0.98);
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+  padding-bottom: $spacing-md;
+  border-bottom: 1rpx solid $color-divider;
+}
+
+.nodeInfo {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.nodeName {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.overtimeBadge {
+  background-color: rgba(239, 68, 68, 0.1);
+  padding: 4rpx 12rpx;
+  border-radius: $radius-xs;
+}
+
+.overtimeText {
+  font-size: 20rpx;
+  color: $color-error;
+  font-weight: $font-weight-medium;
+}
+
+.escalatedBadge {
+  background-color: rgba(245, 158, 11, 0.15);
+  padding: 4rpx 12rpx;
+  border-radius: $radius-xs;
+}
+
+.escalatedText {
+  font-size: 20rpx;
+  color: $color-warning;
+  font-weight: $font-weight-medium;
+}
+
+.bookingInfo {
+  margin-bottom: $spacing-sm;
+}
+
+.cageCode {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-primary;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.cageName {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+}
+
+.timeInfo {
+  margin-bottom: $spacing-md;
+  padding: $spacing-sm $spacing-md;
+  background-color: $color-primary-bg;
+  border-radius: $radius-sm;
+}
+
+.timeItem {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.timeLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  flex-shrink: 0;
+}
+
+.timeValue {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+  flex: 1;
+}
+
+.applicantInfo {
+  margin-bottom: $spacing-md;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  margin-bottom: $spacing-xs;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.infoLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  width: 120rpx;
+  flex-shrink: 0;
+}
+
+.infoValue {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  flex: 1;
+  @include text-ellipsis;
+}
+
+.deadlineInfo {
+  display: flex;
+  align-items: center;
+  padding-top: $spacing-md;
+  border-top: 1rpx solid $color-divider;
+}
+
+.deadlineLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.deadlineValue {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  font-weight: $font-weight-medium;
+  
+  &.overtime {
+    color: $color-error;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: $spacing-md;
+  margin-top: $spacing-lg;
+  padding-top: $spacing-md;
+  border-top: 1rpx solid $color-divider;
+}
+
+.actionBtn {
+  flex: 1;
+  height: $button-height-md;
+  border-radius: $radius-button;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-base;
+  
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+}
+
+.rejectBtn {
+  background-color: $color-bg-hover;
+  border: 2rpx solid $color-border;
+}
+
+.rejectText {
+  font-size: $font-size-md;
+  color: $color-text-secondary;
+  font-weight: $font-weight-medium;
+}
+
+.approveBtn {
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+}
+
+.approveText {
+  font-size: $font-size-md;
+  color: $color-text-white;
+  font-weight: $font-weight-semibold;
+}

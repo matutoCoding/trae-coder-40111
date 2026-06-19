@@ -1,0 +1,105 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-md;
+  transition: all $transition-base;
+  
+  &:active {
+    transform: scale(0.98);
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+}
+
+.code {
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  padding: 6rpx 16rpx;
+  border-radius: $radius-sm;
+}
+
+.codeText {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $color-text-white;
+}
+
+.info {
+  margin-bottom: $spacing-md;
+}
+
+.name {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  display: block;
+  margin-bottom: $spacing-sm;
+}
+
+.meta {
+  display: flex;
+  gap: $spacing-lg;
+}
+
+.metaItem {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+}
+
+.metaLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.metaValue {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-sm;
+}
+
+.capacityText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+}
+
+.typeTag {
+  background-color: $color-primary-bg;
+  padding: 4rpx 12rpx;
+  border-radius: $radius-xs;
+}
+
+.typeTagText {
+  font-size: $font-size-xs;
+  color: $color-primary;
+  font-weight: $font-weight-medium;
+}
+
+.progressBar {
+  height: 6rpx;
+  background-color: $color-divider;
+  border-radius: 3rpx;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, $color-secondary 0%, $color-secondary-light 100%);
+  border-radius: 3rpx;
+  transition: width $transition-slow;
+}

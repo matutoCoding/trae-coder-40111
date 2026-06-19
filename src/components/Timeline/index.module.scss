@@ -1,0 +1,97 @@
+@use '@/styles/variables.scss' as *;
+
+.timeline {
+  padding-left: $spacing-sm;
+}
+
+.timelineItem {
+  display: flex;
+  gap: $spacing-md;
+  padding-bottom: $spacing-lg;
+  
+  &:last-child {
+    padding-bottom: 0;
+  }
+  
+  &.lastItem .content {
+    padding-bottom: 0;
+  }
+}
+
+.dotWrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 24rpx;
+  flex-shrink: 0;
+}
+
+.dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: $radius-round;
+  background-color: $color-primary;
+  z-index: 1;
+  margin-top: 8rpx;
+}
+
+.line {
+  position: absolute;
+  top: 28rpx;
+  bottom: 0;
+  width: 2rpx;
+  background-color: $color-border;
+}
+
+.content {
+  flex: 1;
+  padding-bottom: $spacing-md;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-xs;
+}
+
+.action {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+}
+
+.time {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.operator {
+  display: flex;
+  align-items: center;
+  margin-bottom: $spacing-sm;
+}
+
+.operatorName {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  font-weight: $font-weight-medium;
+}
+
+.operatorRole {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-left: $spacing-xs;
+}
+
+.comment {
+  background-color: $color-bg-page;
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-sm;
+}
+
+.commentText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  line-height: 1.6;
+}
